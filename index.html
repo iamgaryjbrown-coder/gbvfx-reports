@@ -104,7 +104,7 @@
 <!-- Token Bar -->
 <div class="token-bar">
   <div class="dot" id="connDot"></div>
-  <input type="password" id="tokenInput" placeholder="API Token" autocomplete="off">
+  <input type="password" id="tokenInput" placeholder="API Token" autocomplete="off" onkeydown="if(event.key==='Enter')saveToken()">
   <button onclick="saveToken()">Connect</button>
 </div>
 
@@ -198,19 +198,31 @@ let SHOT_DATA = null;
 document.getElementById("tokenInput").value = TOKEN ? "••••••••" : "";
 document.getElementById("bidDateInput").value = new Date().toISOString().split("T")[0];
 if (TOKEN) {
-  document.getElementById("connDot").classList.add("ok");
-  loadProjects();
+  loadProjects().then(function() {
+    document.getElementById("connDot").classList.add("ok");
+  }).catch(function(e) {
+    document.getElementById("connDot").classList.remove("ok");
+    setStatus("Connection failed — check token", "error");
+  });
 }
 
-function saveToken() {
+async function saveToken() {
   const inp = document.getElementById("tokenInput");
   const val = inp.value.trim();
   if (!val || val === "••••••••") return;
   TOKEN = val;
   localStorage.setItem("gbvfx_report_token", TOKEN);
   inp.value = "••••••••";
-  document.getElementById("connDot").classList.add("ok");
-  loadProjects();
+  // Validate token with an actual API call
+  try {
+    await loadProjects();
+    document.getElementById("connDot").classList.add("ok");
+    setStatus("Connected!", "success");
+    setTimeout(function() { setStatus(""); }, 2000);
+  } catch (e) {
+    document.getElementById("connDot").classList.remove("ok");
+    setStatus("Connection failed — check token", "error");
+  }
 }
 
 // ── API ──
@@ -231,18 +243,13 @@ async function apiFetch(path, options) {
 }
 
 async function loadProjects() {
-  try {
-    const data = await apiFetch("/api/reports/projects");
-    PROJECTS = data.projects;
-    const sel = document.getElementById("projectSelect");
-    sel.innerHTML = '<option value="">Select project...</option>';
-    PROJECTS.forEach(function(p) {
-      sel.innerHTML += '<option value="' + p.id + '" data-code="' + p.code + '">' + p.name + ' (' + p.code + ')</option>';
-    });
-  } catch (e) {
-    setStatus("Failed to load projects: " + e.message, "error");
-    document.getElementById("connDot").classList.remove("ok");
-  }
+  const data = await apiFetch("/api/reports/projects");
+  PROJECTS = data.projects;
+  const sel = document.getElementById("projectSelect");
+  sel.innerHTML = '<option value="">Select project...</option>';
+  PROJECTS.forEach(function(p) {
+    sel.innerHTML += '<option value="' + p.id + '" data-code="' + p.code + '">' + p.name + ' (' + p.code + ')</option>';
+  });
 }
 
 async function onProjectChange() {
