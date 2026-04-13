@@ -4,96 +4,48 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GBVFX Reports</title>
-<script src="jspdf.umd.min.js"></script>
-<script src="jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --card: #222;
-    --border: #333;
-    --text: #e0e0e0;
-    --text-dim: #888;
-    --accent: #4a9eff;
-    --accent-hover: #6ab4ff;
-    --orange: #e88a2a;
-    --green: #2ecc71;
-    --red: #e74c3c;
+    --bg: #0f0f0f; --surface: #1a1a1a; --card: #222; --border: #333;
+    --text: #e0e0e0; --text-dim: #888; --accent: #4a9eff; --accent-hover: #6ab4ff;
+    --orange: #e88a2a; --green: #2ecc71; --red: #e74c3c;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg); color: var(--text); padding: 24px;
-    max-width: 900px; margin: 0 auto;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 24px; max-width: 900px; margin: 0 auto; }
   .logo { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
-  .logo span.gb { color: var(--orange); }
-  .logo span.vfx { color: #999; }
+  .logo .gb { color: var(--orange); } .logo .vfx { color: #999; }
   h1 { font-size: 16px; color: var(--text-dim); font-weight: 400; margin-bottom: 24px; }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 20px; margin-bottom: 16px;
-  }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
   .card-title { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
   label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
-  input, select, textarea {
-    width: 100%; padding: 8px 12px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--surface); color: var(--text);
-    font-size: 14px; font-family: inherit;
-  }
+  input, select { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; }
   input:focus, select:focus { outline: none; border-color: var(--accent); }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .field { margin-bottom: 12px; }
-  .radio-group { display: flex; gap: 12px; margin-bottom: 12px; }
-  .radio-group label {
-    display: flex; align-items: center; gap: 6px;
-    padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
-    cursor: pointer; font-size: 14px; color: var(--text); transition: all 0.15s;
-  }
-  .radio-group input[type="radio"] { width: auto; accent-color: var(--accent); }
-  .radio-group label:has(input:checked) { border-color: var(--accent); background: rgba(74, 158, 255, 0.1); }
   .episode-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .ep-check {
-    display: flex; align-items: center; gap: 4px;
-    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
-    cursor: pointer; font-size: 13px; transition: all 0.15s; user-select: none;
-  }
+  .ep-check { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; user-select: none; }
   .ep-check:has(input:checked) { border-color: var(--accent); background: rgba(74, 158, 255, 0.1); }
   .ep-check.all-check:has(input:checked) { border-color: var(--orange); background: rgba(232, 138, 42, 0.15); }
   .ep-check input { width: auto; accent-color: var(--accent); }
-  .btn {
-    padding: 12px 28px; border: none; border-radius: 8px;
-    font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-  }
+  .check-group { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .check-group label { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); }
+  .check-group input { width: auto; accent-color: var(--accent); }
+  .check-group label:has(input:checked) { border-color: var(--accent); background: rgba(74, 158, 255, 0.1); }
+  .btn { padding: 12px 28px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-primary:disabled { background: #555; cursor: not-allowed; }
   .status { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
-  .status.error { color: var(--red); }
-  .status.success { color: var(--green); }
-  .token-bar {
-    display: flex; gap: 8px; align-items: center; margin-bottom: 20px;
-    padding: 12px 16px; background: var(--surface); border-radius: 8px;
-    border: 1px solid var(--border);
-  }
+  .status.error { color: var(--red); } .status.success { color: var(--green); }
+  .token-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; padding: 12px 16px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
   .token-bar input { flex: 1; }
   .token-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
   .token-bar .dot.ok { background: var(--green); }
-  .token-bar button {
-    padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--card); color: var(--text); cursor: pointer; font-size: 13px;
-  }
+  .token-bar button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); cursor: pointer; font-size: 13px; }
   .hidden { display: none; }
-  .loading { opacity: 0.5; pointer-events: none; }
-  .spinner {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid var(--border); border-top-color: var(--accent);
-    border-radius: 50%; animation: spin 0.6s linear infinite;
-    vertical-align: middle; margin-right: 6px;
-  }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .cost-fields { transition: max-height 0.3s, opacity 0.3s; overflow: hidden; }
 </style>
 </head>
 <body>
@@ -108,25 +60,15 @@
   <button id="connBtn" onclick="saveToken()">Connect</button>
 </div>
 
-<!-- Project & Report Type -->
+<!-- Project & Episodes -->
 <div class="card">
   <div class="card-title">Report Setup</div>
-  <div class="row">
-    <div class="field">
-      <label>Project</label>
-      <select id="projectSelect" onchange="onProjectChange()">
-        <option value="">Select project...</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Report Type</label>
-      <div class="radio-group">
-        <label><input type="radio" name="reportType" value="cost" checked onchange="onTypeChange()"> Cost</label>
-        <label><input type="radio" name="reportType" value="status" onchange="onTypeChange()"> Status</label>
-      </div>
-    </div>
+  <div class="field">
+    <label>Project</label>
+    <select id="projectSelect" onchange="onProjectChange()">
+      <option value="">Select project...</option>
+    </select>
   </div>
-
   <div class="field">
     <label>Episodes</label>
     <div class="episode-grid" id="episodeGrid">
@@ -135,78 +77,86 @@
   </div>
 </div>
 
-<!-- Cost Report Fields -->
-<div class="card cost-fields" id="costFields">
-  <div class="card-title">Cost Report Details</div>
+<!-- Optional Columns -->
+<div class="card">
+  <div class="card-title">Include Columns</div>
+  <div class="check-group">
+    <label><input type="checkbox" id="colCost" checked> Cost</label>
+    <label><input type="checkbox" id="colVers"> Vers EDIT</label>
+    <label><input type="checkbox" id="colExr"> EXR Package</label>
+  </div>
+</div>
+
+<!-- Details (shown when Cost is ticked) -->
+<div class="card" id="costFields">
+  <div class="card-title">Report Details</div>
   <div class="row">
     <div class="field">
       <label>Client / Studio</label>
-      <input type="text" id="clientInput" placeholder="e.g. Harbour Pictures">
+      <input type="text" id="clientInput" placeholder="Auto-filled from contacts">
     </div>
     <div class="field">
       <label>Contact</label>
-      <input type="text" id="contactInput" placeholder="e.g. Mark Hedges">
+      <input type="text" id="contactInput" placeholder="Auto-filled from contacts">
     </div>
   </div>
-  <div class="row-3">
-    <div class="field">
-      <label>Bid ID</label>
-      <input type="text" id="bidIdInput" placeholder="Auto-generated">
-    </div>
+  <div class="row">
     <div class="field">
       <label>Bid Date</label>
       <input type="date" id="bidDateInput">
     </div>
     <div class="field">
-      <label>Project Type</label>
-      <input type="text" id="projectTypeInput" value="VFX - Episodic">
+      <label>Additional Line Items (name:value, comma-separated)</label>
+      <input type="text" id="extraLinesInput" placeholder='e.g. Phoenix:30000, Kit Hire:5000'>
     </div>
   </div>
-  <div class="field">
-    <label>Additional Line Items (name:value, comma-separated)</label>
-    <input type="text" id="extraLinesInput" placeholder='e.g. Phoenix:30000, Kit Hire:5000'>
-  </div>
-  <p style="font-size:11px;color:var(--text-dim);margin-top:-8px;">Episode 000 = Production costs, Episode 100 = Contingency (pulled from ShotGrid automatically)</p>
+  <p style="font-size:11px;color:var(--text-dim);margin-top:-8px;">Episode 000 = Production, Episode 100 = Contingency (from ShotGrid)</p>
 </div>
 
 <!-- Generate -->
 <div class="card">
-  <button class="btn btn-primary" id="generateBtn" onclick="generateReport()" disabled>
-    Generate PDF
-  </button>
+  <button class="btn btn-primary" id="generateBtn" onclick="generateReport()" disabled>Generate PDF</button>
   <div class="status" id="statusMsg"></div>
 </div>
 
 <script>
-// ── Config ──
 const API_BASE = "https://deliver.gbvfx.com";
-const GBVFX_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgIAAABrCAYAAAAFIep3AAAACXBIWXMAAAsTAAALEwEAmpwYAAAK4GlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgOS4wLWMwMDEgNzkuMTRlY2I0MmYyYywgMjAyMy8wMS8xMy0xMjoyNTo0NCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIiB4bWxuczpzdFJlZj0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlUmVmIyIgeG1sbnM6cGhvdG9zaG9wPSJodHRwOi8vbnMuYWRvYmUuY29tL3Bob3Rvc2hvcC8xLjAvIiB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIxLjEgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDIxLTExLTIwVDExOjQ0OjE2WiIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNC0wMy0yOVQxNDo0NTo1M1oiIHhtcDpNb2RpZnlEYXRlPSIyMDI0LTAzLTI5VDE0OjQ1OjUzWiIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ZjgwNTdjMmUtN2RhOS00YjRhLTkxNjctZWJiMmFmMGIzZGEzIiB4bXBNTTpEb2N1bWVudElEPSJhZG9iZTpkb2NpZDpwaG90b3Nob3A6MWNjMGI0MDYtZmI1Yy05MDRkLWJjYzctMjA1ZTNiMGY4OGNlIiB4bXBNTTpPcmlnaW5hbERvY3VtZW50SUQ9InhtcC5kaWQ6NmZmNDQ3OWEtOGY2NS00MjIyLWE2NmYtZGVkMWMwOTk0MmY2IiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB0aWZmOk9yaWVudGF0aW9uPSIxIiB0aWZmOlhSZXNvbHV0aW9uPSI3MjAwMDAvMTAwMDAiIHRpZmY6WVJlc29sdXRpb249IjcyMDAwMC8xMDAwMCIgdGlmZjpSZXNvbHV0aW9uVW5pdD0iMiIgZXhpZjpDb2xvclNwYWNlPSIxIiBleGlmOlBpeGVsWERpbWVuc2lvbj0iNzAwIiBleGlmOlBpeGVsWURpbWVuc2lvbj0iNzAwIj4gPHhtcE1NOkhpc3Rvcnk+IDxyZGY6U2VxPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0iY3JlYXRlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo2ZmY0NDc5YS04ZjY1LTQyMjItYTY2Zi1kZWQxYzA5OTQyZjYiIHN0RXZ0OndoZW49IjIwMjEtMTEtMjBUMTE6NDQ6MTZaIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjEuMSAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ODJlMzlkZDctMmY1Yy00MjQzLWI3MTctOWMyZDE0YmEwMzRlIiBzdEV2dDp3aGVuPSIyMDIxLTExLTIwVDExOjQ1OjUwWiIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIxLjEgKE1hY2ludG9zaCkiIHN0RXZ0OmNoYW5nZWQ9Ii8iLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOmU1MzU1ODhkLTdjN2MtNGVmNC1hZDUxLTc0NGE1NGNkNTgzMyIgc3RFdnQ6d2hlbj0iMjAyNC0wMy0yOVQxNDo0NTo1M1oiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyNC4yIChNYWNpbnRvc2gpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJjb252ZXJ0ZWQiIHN0RXZ0OnBhcmFtZXRlcnM9ImZyb20gYXBwbGljYXRpb24vdm5kLmFkb2JlLnBob3Rvc2hvcCB0byBpbWFnZS9wbmciLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImRlcml2ZWQiIHN0RXZ0OnBhcmFtZXRlcnM9ImNvbnZlcnRlZCBmcm9tIGFwcGxpY2F0aW9uL3ZuZC5hZG9iZS5waG90b3Nob3AgdG8gaW1hZ2UvcG5nIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDpmODA1N2MyZS03ZGE5LTRiNGEtOTE2Ny1lYmIyYWYwYjNkYTMiIHN0RXZ0OndoZW49IjIwMjQtMDMtMjlUMTQ6NDU6NTNaIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjQuMiAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6ZTUzNTU4OGQtN2M3Yy00ZWY0LWFkNTEtNzQ0YTU0Y2Q1ODMzIiBzdFJlZjpkb2N1bWVudElEPSJhZG9iZTpkb2NpZDpwaG90b3Nob3A6NjcxZDZhNjEtOWYzMy0wYjQyLTg4OGMtYmQ3N2MwNDZlMzYyIiBzdFJlZjpvcmlnaW5hbERvY3VtZW50SUQ9InhtcC5kaWQ6NmZmNDQ3OWEtOGY2NS00MjIyLWE2NmYtZGVkMWMwOTk0MmY2Ii8+IDxwaG90b3Nob3A6VGV4dExheWVycz4gPHJkZjpCYWc+IDxyZGY6bGkgcGhvdG9zaG9w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";
 let TOKEN = localStorage.getItem("gbvfx_report_token") || "";
 let PROJECTS = [];
 let EPISODES = [];
-let SHOT_DATA = null;
 
-// ── Init ──
-document.getElementById("tokenInput").value = TOKEN ? "••••••••" : "";
+// Init
 document.getElementById("bidDateInput").value = new Date().toISOString().split("T")[0];
 if (TOKEN) {
+  document.getElementById("tokenInput").value = "••••••••";
   loadProjects().then(function() {
     document.getElementById("connDot").classList.add("ok");
     document.getElementById("connBtn").textContent = "Connected";
-  }).catch(function(e) {
+  }).catch(function() {
     document.getElementById("connDot").classList.remove("ok");
-    setStatus("Connection failed — check token", "error");
   });
 }
 
+// Show/hide cost fields based on checkbox
+document.getElementById("colCost").addEventListener("change", function() {
+  document.getElementById("costFields").style.display = this.checked ? "block" : "none";
+});
+
+async function apiFetch(path, options) {
+  var res = await fetch(API_BASE + path, {
+    ...options,
+    headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json", ...(options && options.headers || {}) },
+  });
+  if (!res.ok) throw new Error("API " + res.status + ": " + (await res.text()));
+  return res.json();
+}
+
 async function saveToken() {
-  const inp = document.getElementById("tokenInput");
-  const val = inp.value.trim();
+  var val = document.getElementById("tokenInput").value.trim();
   if (!val || val === "••••••••") return;
   TOKEN = val;
   localStorage.setItem("gbvfx_report_token", TOKEN);
-  inp.value = "••••••••";
-  // Validate token with an actual API call
+  document.getElementById("tokenInput").value = "••••••••";
   try {
     await loadProjects();
     document.getElementById("connDot").classList.add("ok");
@@ -219,51 +169,55 @@ async function saveToken() {
   }
 }
 
-// ── API ──
-async function apiFetch(path, options) {
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      "Authorization": "Bearer " + TOKEN,
-      "Content-Type": "application/json",
-      ...(options && options.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error("API " + res.status + ": " + txt);
-  }
-  return res.json();
-}
-
 async function loadProjects() {
-  const data = await apiFetch("/api/reports/projects");
+  var data = await apiFetch("/api/reports/projects");
   PROJECTS = data.projects;
-  const sel = document.getElementById("projectSelect");
+  var sel = document.getElementById("projectSelect");
   var html = '<option value="">Select project...</option>';
   PROJECTS.forEach(function(p) {
-    html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '" data-type="' + (p.project_type || 'VFX - Episodic') + '">' + p.name + ' (' + p.code + ')</option>';
+    html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '">' + p.name + ' (' + p.code + ')</option>';
   });
   sel.innerHTML = html;
 }
 
+function resolveContact(code) {
+  // Read sg_forms_contact preference from contacts form localStorage
+  try {
+    var contacts = JSON.parse(localStorage.getItem("gbvfx_contacts_v2") || "{}");
+    var proj = contacts[code];
+    if (!proj) return null;
+    var pref = proj.sg_forms_contact; // "producer" or "pps"
+    if (!pref) return null;
+    var cList = proj.contacts || [];
+    var match = cList.find(function(c) { return c.role.toLowerCase() === pref.toLowerCase(); });
+    if (match) return { client: proj.production_company || "", contact: match.name || "" };
+  } catch (e) {}
+  return null;
+}
+
 async function onProjectChange() {
-  const sel = document.getElementById("projectSelect");
-  const pid = sel.value;
+  var sel = document.getElementById("projectSelect");
+  var pid = sel.value;
   if (!pid) {
     document.getElementById("episodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
     document.getElementById("generateBtn").disabled = true;
     return;
   }
-  const opt = sel.options[sel.selectedIndex];
-  const code = opt.dataset.code;
-  document.getElementById("bidIdInput").placeholder = "GBVFX_" + code + "_" + new Date().toISOString().slice(2,10).replace(/-/g,"");
-  document.getElementById("clientInput").value = opt.dataset.client || "";
-  document.getElementById("contactInput").value = opt.dataset.contact || "";
-  document.getElementById("projectTypeInput").value = opt.dataset.type || "VFX - Episodic";
+  var opt = sel.options[sel.selectedIndex];
+  var code = opt.dataset.code;
+
+  // Resolve contact from sg_forms_contact preference, fallback to API data
+  var resolved = resolveContact(code);
+  if (resolved) {
+    document.getElementById("clientInput").value = resolved.client;
+    document.getElementById("contactInput").value = resolved.contact;
+  } else {
+    document.getElementById("clientInput").value = opt.dataset.client || "";
+    document.getElementById("contactInput").value = opt.dataset.contact || "";
+  }
 
   try {
-    const data = await apiFetch("/api/reports/episodes?project_id=" + pid);
+    var data = await apiFetch("/api/reports/episodes?project_id=" + pid);
     EPISODES = data.episodes;
     renderEpisodes();
   } catch (e) {
@@ -272,10 +226,10 @@ async function onProjectChange() {
 }
 
 function renderEpisodes() {
-  const grid = document.getElementById("episodeGrid");
-  var html = '<label class="ep-check all-check"><input type="checkbox" id="epAll" onchange="toggleAll()"> All</label>';
+  var grid = document.getElementById("episodeGrid");
+  var html = '<label class="ep-check all-check"><input type="checkbox" id="epAll" onchange="toggleAll()" checked> All</label>';
   EPISODES.forEach(function(ep) {
-    html += '<label class="ep-check"><input type="checkbox" class="ep-cb" value="' + ep.code + '" onchange="checkEpSelection()"> ' + ep.code + '</label>';
+    html += '<label class="ep-check"><input type="checkbox" class="ep-cb" value="' + ep.code + '" checked onchange="checkEpSelection()"> ' + ep.code + '</label>';
   });
   grid.innerHTML = html;
   document.getElementById("generateBtn").disabled = false;
@@ -299,522 +253,6 @@ function getSelectedEpisodes() {
   return selected.length > 0 ? selected : ["all"];
 }
 
-function onTypeChange() {
-  var type = document.querySelector('input[name="reportType"]:checked').value;
-  document.getElementById("costFields").style.display = (type === "cost") ? "block" : "none";
-}
-
-function setStatus(msg, cls) {
-  var el = document.getElementById("statusMsg");
-  el.textContent = msg;
-  el.className = "status" + (cls ? " " + cls : "");
-}
-
-// ── Report Generation ──
-async function generateReport() {
-  var btn = document.getElementById("generateBtn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Fetching data...';
-  setStatus("");
-
-  var type = document.querySelector('input[name="reportType"]:checked').value;
-  var sel = document.getElementById("projectSelect");
-  var projectId = parseInt(sel.value);
-  var projectCode = sel.options[sel.selectedIndex].dataset.code;
-  var projectName = sel.options[sel.selectedIndex].text;
-  var episodes = getSelectedEpisodes();
-
-  try {
-    btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
-    var data = await apiFetch("/api/reports/shots", {
-      method: "POST",
-      body: JSON.stringify({ project_id: projectId, episodes: episodes }),
-    });
-    SHOT_DATA = data;
-
-    btn.innerHTML = '<span class="spinner"></span>Generating PDF...';
-    await new Promise(function(r) { setTimeout(r, 100); }); // let UI update
-
-    if (type === "cost") {
-      buildCostPDF(data, projectName, projectCode, episodes);
-    } else {
-      buildStatusPDF(data, projectName, projectCode, episodes);
-    }
-
-    setStatus("PDF generated successfully!", "success");
-  } catch (e) {
-    setStatus("Error: " + e.message, "error");
-    console.error(e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Generate PDF";
-  }
-}
-
-// ── Cost PDF ──
-function buildCostPDF(data, projectName, projectCode, episodes) {
-  var jsPDF = window.jspdf.jsPDF;
-  var doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  var pw = 297, ph = 210; // A4 landscape mm
-  var margin = 15;
-  var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
-
-  // ── Page 1: Summary (Style 3B — vertical chart, 3-col info) ──
-  // GBVFX Logo (real PNG — 514×107px, ratio 4.8:1)
-  try {
-    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 8.3);
-  } catch(e) {
-    doc.setFontSize(32);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(232, 138, 42);
-    doc.text("GB", margin, 18);
-    doc.setTextColor(153, 153, 153);
-    doc.text("VFX", margin + doc.getTextWidth("GB"), 18);
-  }
-
-  // Orange line under logo (full width margin to margin)
-  doc.setDrawColor(232, 138, 42);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 19, pw - margin, 19);
-
-  // Subtitle (muted grey, not orange)
-  doc.setFontSize(12);
-  doc.setTextColor(140, 140, 140);
-  doc.setFont("helvetica", "normal");
-  doc.text("SUMMARY OF BID / ESTIMATE", margin, 26);
-
-  // Orange line under subtitle (full width margin to margin)
-  doc.setDrawColor(232, 138, 42);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 29, pw - margin, 29);
-
-  // ── 3-column info block ──
-  var bidId = document.getElementById("bidIdInput").value || ("GBVFX_" + projectCode + "_" + new Date().toISOString().slice(2,10).replace(/-/g,""));
-  var bidDate = document.getElementById("bidDateInput").value || new Date().toISOString().split("T")[0];
-  var client = document.getElementById("clientInput").value || "";
-  var contact = document.getElementById("contactInput").value || "";
-  var projectType = document.getElementById("projectTypeInput").value || "VFX - Episodic";
-
-  var infoY = 36;
-  var infoCol1 = margin;
-  var infoCol2 = margin + 95;
-  var infoCol3 = pw / 2 + 80;
-
-  // Row 1: labels
-  doc.setFontSize(7);
-  doc.setTextColor(140, 140, 140);
-  doc.setFont("helvetica", "normal");
-  doc.text("PROJECT", infoCol1, infoY);
-  doc.text("CLIENT", infoCol2, infoY);
-  doc.text("DATE", infoCol3, infoY);
-
-  // Row 1: values
-  doc.setFontSize(10);
-  doc.setTextColor(40, 40, 40);
-  doc.setFont("helvetica", "normal");
-  doc.text(projectName + " (" + projectCode + ")", infoCol1, infoY + 6);
-  doc.text(client, infoCol2, infoY + 6);
-  doc.text(formatDate(bidDate), infoCol3, infoY + 6);
-
-  // Row 2: labels
-  doc.setFontSize(7);
-  doc.setTextColor(140, 140, 140);
-  doc.text("TYPE", infoCol1, infoY + 15);
-  doc.text("CONTACT", infoCol2, infoY + 15);
-
-  // Row 2: values
-  doc.setFontSize(10);
-  doc.setTextColor(40, 40, 40);
-  doc.text(projectType, infoCol1, infoY + 21);
-  doc.text(contact, infoCol2, infoY + 21);
-
-  // Orange line between info block and tables (full width)
-  doc.setDrawColor(232, 138, 42);
-  doc.setLineWidth(0.5);
-  doc.line(margin, infoY + 26, pw - margin, infoY + 26);
-
-  // ── Episode cost table (left side) ──
-  var tableY = infoY + 32;
-  var extraLines = parseExtraLines(document.getElementById("extraLinesInput").value);
-  var epKeys = Object.keys(data.episode_totals);
-  var tableW = pw / 2 - margin + 5;
-  var rowH = 7;
-
-  var prodCost = data.episode_totals["000"] || 0;
-  var contingency = data.episode_totals["100"] || 0;
-  var shotEpisodes = epKeys.filter(function(k) { return k !== "000" && k !== "100"; });
-
-  // Production row
-  if (prodCost > 0) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(60, 60, 60);
-    doc.text("PRODUCTION", margin + 3, tableY + 5);
-    doc.text(fmtGBP(prodCost), margin + tableW - 3, tableY + 5, { align: "right" });
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
-    tableY += rowH + 1;
-  }
-
-  // Episode rows
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  shotEpisodes.forEach(function(ep) {
-    doc.setTextColor(60, 60, 60);
-    doc.text("VFX " + ep, margin + 3, tableY + 5);
-    doc.text(fmtGBP(data.episode_totals[ep]), margin + tableW - 3, tableY + 5, { align: "right" });
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
-    tableY += rowH;
-  });
-
-  // Extra line items
-  var extraTotal = 0;
-  extraLines.forEach(function(item) {
-    doc.setTextColor(60, 60, 60);
-    doc.text(item.name.toUpperCase(), margin + 3, tableY + 5);
-    doc.text(fmtGBP(item.value), margin + tableW - 3, tableY + 5, { align: "right" });
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
-    extraTotal += item.value;
-    tableY += rowH;
-  });
-
-  // Contingency
-  if (contingency > 0) {
-    doc.setTextColor(60, 60, 60);
-    doc.text("CONTINGENCY", margin + 3, tableY + 5);
-    doc.text(fmtGBP(contingency), margin + tableW - 3, tableY + 5, { align: "right" });
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
-    tableY += rowH;
-  }
-
-  // Grand total (orange filled bar)
-  tableY += 2;
-  doc.setFillColor(232, 138, 42);
-  doc.rect(margin, tableY, tableW, rowH + 2, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  var grandTotal = data.grand_total + extraTotal;
-  doc.text("TOTAL", margin + 3, tableY + 6);
-  doc.text(fmtGBP(grandTotal), margin + tableW - 3, tableY + 6, { align: "right" });
-  var totalBarBottom = tableY + rowH + 2;
-
-  // ── Vertical bar chart (right side) ──
-  if (isAll && shotEpisodes.length > 1) {
-    var maxVal = Math.max.apply(null, shotEpisodes.map(function(k) { return data.episode_totals[k]; }));
-    // Round maxVal up to a clean number for axis
-    var magnitude = Math.pow(10, Math.floor(Math.log10(maxVal)));
-    var axisMax = Math.ceil(maxVal / (magnitude / 2)) * (magnitude / 2);
-
-    var chartLeft = pw / 2 + 15;
-    var chartRight = pw - margin;
-    var chartW = chartRight - chartLeft;
-    var yAxisX = chartLeft + 22;
-    var chartTop = infoY + 32;
-    var chartBottom = totalBarBottom;
-    var plotH = chartBottom - chartTop;
-    var plotW = chartRight - yAxisX;
-
-    // Date title above chart
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.setFont("helvetica", "normal");
-    doc.text(formatDate(bidDate), yAxisX + plotW / 2, chartTop - 5, { align: "center" });
-
-    // Y-axis gridlines and labels
-    var numTicks = 4;
-    for (var t = 0; t <= numTicks; t++) {
-      var tickVal = axisMax * t / numTicks;
-      var tickY = chartBottom - (t / numTicks) * plotH;
-      doc.setFontSize(6);
-      doc.setTextColor(140, 140, 140);
-      doc.text(fmtGBP(tickVal), chartLeft + 20, tickY + 1, { align: "right" });
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.2);
-      doc.line(yAxisX, tickY, chartRight, tickY);
-    }
-
-    // Bars
-    var nBars = shotEpisodes.length;
-    var barSlot = plotW / nBars;
-    var barW = barSlot * 0.6;
-    var barGap = barSlot * 0.2;
-
-    shotEpisodes.forEach(function(ep, i) {
-      var val = data.episode_totals[ep];
-      var barH = (val / axisMax) * plotH;
-      var bx = yAxisX + i * barSlot + barGap;
-      var by = chartBottom - barH;
-
-      // Bar (slate grey)
-      doc.setFillColor(150, 160, 172);
-      doc.rect(bx, by, barW, barH, "F");
-
-      // Value above bar
-      doc.setFontSize(7);
-      doc.setTextColor(60, 60, 60);
-      doc.text(fmtGBP(val), bx + barW / 2, by - 2, { align: "center" });
-
-      // Episode label below
-      doc.setFontSize(7);
-      doc.setTextColor(100, 100, 100);
-      doc.text("VFX " + ep, bx + barW / 2, chartBottom + 5, { align: "center" });
-    });
-  }
-
-  // Date footer
-  doc.setFontSize(7);
-  doc.setTextColor(180, 180, 180);
-  doc.text("Generated " + new Date().toLocaleDateString("en-GB"), pw - margin, ph - 8, { align: "right" });
-
-  // ── Shot Detail Pages ──
-  addShotPages(doc, data, "cost");
-
-  // Download
-  var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  doc.save("GBVFX_" + projectCode + "_Cost_Report_" + dateStr + ".pdf");
-}
-
-// ── Status PDF ──
-function buildStatusPDF(data, projectName, projectCode, episodes) {
-  var jsPDF = window.jspdf.jsPDF;
-  var doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  var pw = 297, ph = 210;
-  var margin = 15;
-  var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
-
-  // Header with real logo (Style 3B — 514×107px, ratio 4.8:1)
-  try {
-    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 8.3);
-  } catch(e) {
-    doc.setFontSize(32);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(232, 138, 42);
-    doc.text("GB", margin, 18);
-    doc.setTextColor(153, 153, 153);
-    doc.text("VFX", margin + doc.getTextWidth("GB"), 18);
-  }
-
-  // Orange line under logo (margin to margin)
-  doc.setDrawColor(232, 138, 42);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 19, pw - margin, 19);
-
-  doc.setFontSize(14);
-  doc.setTextColor(232, 138, 42);
-  doc.text("STATUS REPORT", margin, 26);
-
-  // Orange line under title (margin to margin)
-  doc.setDrawColor(232, 138, 42);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 29, pw - margin, 29);
-
-  // Project info
-  doc.setFontSize(10);
-  doc.setTextColor(60, 60, 60);
-  doc.setFont("helvetica", "bold");
-  doc.text(projectName, margin, 36);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(formatDate(new Date().toISOString().split("T")[0]), margin + doc.getTextWidth(projectName) + 8, 36);
-
-  // Episode status summary table
-  var epKeys = Object.keys(data.episode_totals);
-  var tableY = 44;
-
-  // Count statuses per episode
-  var epStatusCounts = {};
-  var allStatuses = new Set();
-  data.shots.forEach(function(s) {
-    if (!epStatusCounts[s.episode]) epStatusCounts[s.episode] = {};
-    var st = s.status || "unknown";
-    allStatuses.add(st);
-    epStatusCounts[s.episode][st] = (epStatusCounts[s.episode][st] || 0) + 1;
-  });
-  var statusList = Array.from(allStatuses).sort();
-
-  // Table header
-  var cols = [{ header: "Episode", dataKey: "ep" }, { header: "Shots", dataKey: "total" }];
-  statusList.forEach(function(st) { cols.push({ header: statusLabel(st), dataKey: st }); });
-
-  var rows = [];
-  epKeys.forEach(function(ep) {
-    var row = { ep: ep, total: 0 };
-    statusList.forEach(function(st) {
-      var c = (epStatusCounts[ep] && epStatusCounts[ep][st]) || 0;
-      row[st] = c || "";
-      row.total += c;
-    });
-    rows.push(row);
-  });
-
-  doc.autoTable({
-    startY: tableY,
-    head: [cols.map(function(c) { return c.header; })],
-    body: rows.map(function(r) { return cols.map(function(c) { return r[c.dataKey]; }); }),
-    margin: { left: margin, right: margin },
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [232, 138, 42], textColor: [255, 255, 255], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [248, 248, 248] },
-    theme: "grid",
-  });
-
-  // Shot detail pages
-  addShotPages(doc, data, "status");
-
-  var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  doc.save("GBVFX_" + projectCode + "_Status_Report_" + dateStr + ".pdf");
-}
-
-// ── Shared: Shot Detail Pages ──
-function addShotPages(doc, data, type) {
-  var pw = 297, ph = 210, margin = 15;
-
-  // Group shots by episode
-  var grouped = {};
-  data.shots.forEach(function(s) {
-    if (!grouped[s.episode]) grouped[s.episode] = [];
-    grouped[s.episode].push(s);
-  });
-
-  var epKeys = Object.keys(grouped).sort();
-
-  epKeys.forEach(function(ep) {
-    doc.addPage("a4", "landscape");
-    var shots = grouped[ep];
-
-    // Episode header
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(232, 138, 42);
-    doc.text("Episode " + ep, margin, 14);
-
-    // Shot count
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.setFont("helvetica", "normal");
-    doc.text(shots.length + " shot" + (shots.length !== 1 ? "s" : ""), margin + doc.getTextWidth("Episode " + ep + "  "), 14);
-
-    // Build table data
-    var head, colStyles, bodyRows;
-
-    if (type === "cost") {
-      head = [["Ep", "", "Shot Code", "Description", "Notes", "Status", "Cost"]];
-      colStyles = {
-        0: { cellWidth: 12 },  // episode
-        1: { cellWidth: 22 },  // thumbnail
-        2: { cellWidth: 32 },  // shot code
-        3: { cellWidth: 80 },  // description
-        4: { cellWidth: 50 },  // notes
-        5: { cellWidth: 25 },  // status
-        6: { cellWidth: 22, halign: "right" },  // cost
-      };
-    } else {
-      head = [["Ep", "", "Shot Code", "Description", "Notes", "Status"]];
-      colStyles = {
-        0: { cellWidth: 12 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 32 },
-        3: { cellWidth: 90 },
-        4: { cellWidth: 55 },
-        5: { cellWidth: 32 },
-      };
-    }
-
-    bodyRows = shots.map(function(s) {
-      var row = [
-        s.episode,
-        "", // thumbnail placeholder
-        s.code,
-        s.description || "",
-        s.notes || "",
-        statusLabel(s.status),
-      ];
-      if (type === "cost") row.push(s.cost ? fmtGBP(s.cost) : "");
-      return row;
-    });
-
-    // Thumbnail images keyed by row index
-    var thumbMap = {};
-    shots.forEach(function(s, i) {
-      if (s.thumbnail_b64) thumbMap[i] = s.thumbnail_b64;
-    });
-
-    doc.autoTable({
-      startY: 18,
-      head: head,
-      body: bodyRows,
-      margin: { left: margin, right: margin },
-      styles: { fontSize: 7.5, cellPadding: 2, minCellHeight: 14, valign: "middle", overflow: "linebreak" },
-      headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5 },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      columnStyles: colStyles,
-      theme: "grid",
-      didDrawCell: function(hookData) {
-        // Thumbnail in column 1
-        if (hookData.section === "body" && hookData.column.index === 1) {
-          var img = thumbMap[hookData.row.index];
-          if (img) {
-            try {
-              doc.addImage(img, "JPEG",
-                hookData.cell.x + 1, hookData.cell.y + 1,
-                20, 11);
-            } catch (e) { /* skip broken thumbs */ }
-          }
-        }
-        // Status badge colouring (column 5 for both cost and status)
-        var statusColIdx = (type === "cost") ? 5 : 5;
-        if (hookData.section === "body" && hookData.column.index === statusColIdx) {
-          var statusText = hookData.cell.raw;
-          var colour = statusColour(statusText);
-          if (colour) {
-            var cx = hookData.cell.x + 2;
-            var cy = hookData.cell.y + hookData.cell.height / 2 - 3;
-            var bw = Math.min(hookData.cell.width - 4, doc.getTextWidth(statusText) + 6);
-            doc.setFillColor(colour[0], colour[1], colour[2]);
-            doc.roundedRect(cx, cy, bw, 6, 1, 1, "F");
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(6.5);
-            doc.text(statusText, cx + bw / 2, cy + 4.2, { align: "center" });
-          }
-        }
-      },
-    });
-
-    // Episode total (cost only)
-    if (type === "cost" && data.episode_totals[ep]) {
-      var finalY = doc.lastAutoTable.finalY || (ph - 20);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(60, 60, 60);
-      doc.text("Episode " + ep + " Total: " + fmtGBP(data.episode_totals[ep]),
-        pw - margin, finalY + 8, { align: "right" });
-    }
-
-    // Page footer
-    doc.setFontSize(7);
-    doc.setTextColor(180, 180, 180);
-    doc.setFont("helvetica", "normal");
-    doc.text("Generated " + new Date().toLocaleDateString("en-GB"), pw - margin, ph - 5, { align: "right" });
-  });
-}
-
-// ── Helpers ──
-function fmtGBP(v) {
-  if (!v && v !== 0) return "";
-  return "\u00A3" + Number(v).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function formatDate(d) {
-  if (!d) return "";
-  var parts = d.split("-");
-  var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return parseInt(parts[2]) + " " + months[parseInt(parts[1]) - 1] + " " + parts[0];
-}
-
 function parseExtraLines(str) {
   if (!str || !str.trim()) return [];
   return str.split(",").map(function(item) {
@@ -824,46 +262,82 @@ function parseExtraLines(str) {
   }).filter(Boolean);
 }
 
-var STATUS_MAP = {
-  "bid": "Bidding", "omt": "Omit", "hld": "Hold",
-  "ip": "In Progress", "rdy": "Ready to Start",
-  "rev": "Pending Review", "vwd": "Viewed",
-  "notes": "Notes", "aprv": "Approved",
-  "na": "N/A", "fin": "Final",
-  "dlvr": "Delivered", "send": "Send",
-  "4rv": "For Review", "sndexr": "Send EXR",
-  "exr": "EXR Sent", "xrnap": "EXR Not Approved",
-  "wtg": "Waiting", "cbb": "CBB",
-};
-
-function statusLabel(code) {
-  return STATUS_MAP[code] || code || "";
+function setStatus(msg, cls) {
+  var el = document.getElementById("statusMsg");
+  el.textContent = msg;
+  el.className = "status" + (cls ? " " + cls : "");
 }
 
-var STATUS_COLOURS = {
-  "Bidding": [158, 158, 158],
-  "In Progress": [33, 150, 243],
-  "Pending Review": [156, 39, 176],
-  "For Review": [156, 39, 176],
-  "Approved": [76, 175, 80],
-  "Final": [76, 175, 80],
-  "Notes": [255, 152, 0],
-  "Delivered": [0, 150, 136],
-  "Send": [0, 188, 212],
-  "Send EXR": [0, 188, 212],
-  "EXR Sent": [139, 195, 74],
-  "EXR Not Approved": [244, 67, 54],
-  "Omit": [96, 125, 139],
-  "Hold": [121, 85, 72],
-  "Ready to Start": [63, 81, 181],
-  "Waiting": [255, 193, 7],
-  "Viewed": [103, 58, 183],
-  "CBB": [158, 158, 158],
-  "N/A": [189, 189, 189],
-};
+async function generateReport() {
+  var btn = document.getElementById("generateBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Fetching data...';
+  setStatus("");
 
-function statusColour(label) {
-  return STATUS_COLOURS[label] || null;
+  var sel = document.getElementById("projectSelect");
+  var projectId = parseInt(sel.value);
+  var projectCode = sel.options[sel.selectedIndex].dataset.code;
+  var projectName = sel.options[sel.selectedIndex].text;
+  var episodes = getSelectedEpisodes();
+
+  var showCost = document.getElementById("colCost").checked;
+  var showVers = document.getElementById("colVers").checked;
+  var showExr = document.getElementById("colExr").checked;
+
+  try {
+    // Step 1: fetch shot data
+    btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
+    var data = await apiFetch("/api/reports/shots", {
+      method: "POST",
+      body: JSON.stringify({ project_id: projectId, episodes: episodes }),
+    });
+
+    // Step 2: build payload
+    var payload = {
+      project_name: projectName,
+      project_code: projectCode,
+      client: document.getElementById("clientInput").value || "",
+      contact: document.getElementById("contactInput").value || "",
+      bid_date: document.getElementById("bidDateInput").value || new Date().toISOString().split("T")[0],
+      extra_lines: parseExtraLines(document.getElementById("extraLinesInput").value),
+      episode_totals: data.episode_totals,
+      grand_total: data.grand_total,
+      shots: data.shots,
+      show_cost: showCost,
+      show_vers: showVers,
+      show_exr: showExr,
+    };
+
+    // Step 3: request PDF from server
+    btn.innerHTML = '<span class="spinner"></span>Generating PDF...';
+    var res = await fetch(API_BASE + "/api/reports/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      var errText = await res.text();
+      throw new Error("PDF generation failed: " + errText);
+    }
+
+    // Step 4: download
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+    a.download = "GBVFX_" + projectCode + "_Report_" + dateStr + ".pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setStatus("PDF downloaded!", "success");
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Generate PDF";
 }
 </script>
 </body>
