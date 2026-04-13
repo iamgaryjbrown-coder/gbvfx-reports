@@ -84,6 +84,7 @@
     <label><input type="checkbox" id="colCost" checked> Cost</label>
     <label><input type="checkbox" id="colVers"> Vers EDIT</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
+    <label><input type="checkbox" id="colProd"> Include Prod/Supervision shots</label>
   </div>
 </div>
 
@@ -283,6 +284,7 @@ async function generateReport() {
   var showCost = document.getElementById("colCost").checked;
   var showVers = document.getElementById("colVers").checked;
   var showExr = document.getElementById("colExr").checked;
+  var showProd = document.getElementById("colProd").checked;
 
   try {
     // Step 1: fetch shot data
@@ -306,6 +308,7 @@ async function generateReport() {
       show_cost: showCost,
       show_vers: showVers,
       show_exr: showExr,
+      show_prod: showProd,
     };
 
     // Step 3: request PDF from server
