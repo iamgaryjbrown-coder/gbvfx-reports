@@ -207,6 +207,7 @@ async function onProjectChange() {
   var pid = sel.value;
   if (!pid) {
     document.getElementById("episodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
+    document.getElementById("shotEpisodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
     document.getElementById("generateBtn").disabled = true;
     return;
   }
