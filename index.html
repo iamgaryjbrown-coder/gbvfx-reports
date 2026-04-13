@@ -309,15 +309,16 @@ async function generateReport() {
   var showExr = document.getElementById("colExr").checked;
   var showProd = document.getElementById("colProd").checked;
 
-  // Fetch all episodes so server has full data, filtering happens server-side
-  var fetchEpisodes = "all";
-
   try {
-    // Step 1: fetch shot data
+    // Step 1: fetch shot data — pass shot_episodes so thumbnails only download for those
     btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
     var data = await apiFetch("/api/reports/shots", {
       method: "POST",
-      body: JSON.stringify({ project_id: projectId, episodes: [fetchEpisodes] }),
+      body: JSON.stringify({
+        project_id: projectId,
+        episodes: ["all"],
+        thumb_episodes: shotEpisodes
+      }),
     });
 
     // Step 2: build payload
