@@ -240,10 +240,11 @@ async function loadProjects() {
   const data = await apiFetch("/api/reports/projects");
   PROJECTS = data.projects;
   const sel = document.getElementById("projectSelect");
-  sel.innerHTML = '<option value="">Select project...</option>';
+  var html = '<option value="">Select project...</option>';
   PROJECTS.forEach(function(p) {
-    sel.innerHTML += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '" data-type="' + (p.project_type || 'VFX - Episodic') + '">' + p.name + ' (' + p.code + ')</option>';
+    html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '" data-type="' + (p.project_type || 'VFX - Episodic') + '">' + p.name + ' (' + p.code + ')</option>';
   });
+  sel.innerHTML = html;
 }
 
 async function onProjectChange() {
@@ -358,34 +359,39 @@ function buildCostPDF(data, projectName, projectCode, episodes) {
   var margin = 15;
   var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
 
-  // ── Page 1: Summary ──
-  // GBVFX Logo (real PNG)
+  // ── Page 1: Summary (Style 3B) ──
+  // GBVFX Logo (real PNG — 514×107px, ratio 4.8:1)
   try {
-    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 12);
+    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 8.3);
   } catch(e) {
     // Fallback to text logo
     doc.setFontSize(32);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(232, 138, 42);
-    doc.text("GB", margin, 22);
+    doc.text("GB", margin, 18);
     doc.setTextColor(153, 153, 153);
-    doc.text("VFX", margin + doc.getTextWidth("GB"), 22);
+    doc.text("VFX", margin + doc.getTextWidth("GB"), 18);
   }
 
-  // Title
-  doc.setFontSize(14);
-  doc.setTextColor(232, 138, 42);
-  doc.text("SUMMARY OF BID / ESTIMATE", margin, 32);
-
-  // Divider line
+  // Orange line under logo (margin to margin)
   doc.setDrawColor(232, 138, 42);
   doc.setLineWidth(0.5);
-  doc.line(margin, 35, pw - margin, 35);
+  doc.line(margin, 19, pw - margin, 19);
+
+  // Subtitle
+  doc.setFontSize(14);
+  doc.setTextColor(232, 138, 42);
+  doc.text("SUMMARY OF BID / ESTIMATE", margin, 26);
+
+  // Orange line under subtitle (margin to margin)
+  doc.setDrawColor(232, 138, 42);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 29, pw - margin, 29);
 
   // Project info
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  var infoY = 43;
+  var infoY = 34;
   var col1 = margin, col2 = margin + 32, col3 = pw/2 + 10, col4 = pw/2 + 45;
 
   var bidId = document.getElementById("bidIdInput").value || ("GBVFX_" + projectCode + "_" + new Date().toISOString().slice(2,10).replace(/-/g,""));
@@ -492,7 +498,7 @@ function buildCostPDF(data, projectName, projectCode, episodes) {
 
   // Bar chart (if All) — only VFX episodes, not 000/100
   if (isAll && shotEpisodes.length > 1) {
-    var chartX = margin + tableW + 20;
+    var chartX = margin + tableW + 10;
     var chartY = infoY + 28;
     var chartW = pw - margin - chartX;
     var chartH = Math.min(120, (shotEpisodes.length + 1) * 16);
@@ -550,38 +556,44 @@ function buildStatusPDF(data, projectName, projectCode, episodes) {
   var margin = 15;
   var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
 
-  // Header with real logo
+  // Header with real logo (Style 3B — 514×107px, ratio 4.8:1)
   try {
-    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 12);
+    doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 8.3);
   } catch(e) {
     doc.setFontSize(32);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(232, 138, 42);
-    doc.text("GB", margin, 22);
+    doc.text("GB", margin, 18);
     doc.setTextColor(153, 153, 153);
-    doc.text("VFX", margin + doc.getTextWidth("GB"), 22);
+    doc.text("VFX", margin + doc.getTextWidth("GB"), 18);
   }
+
+  // Orange line under logo (margin to margin)
+  doc.setDrawColor(232, 138, 42);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 19, pw - margin, 19);
 
   doc.setFontSize(14);
   doc.setTextColor(232, 138, 42);
-  doc.text("STATUS REPORT", margin, 32);
+  doc.text("STATUS REPORT", margin, 26);
 
+  // Orange line under title (margin to margin)
   doc.setDrawColor(232, 138, 42);
   doc.setLineWidth(0.5);
-  doc.line(margin, 35, pw - margin, 35);
+  doc.line(margin, 29, pw - margin, 29);
 
   // Project info
   doc.setFontSize(10);
   doc.setTextColor(60, 60, 60);
   doc.setFont("helvetica", "bold");
-  doc.text(projectName, margin, 44);
+  doc.text(projectName, margin, 36);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(formatDate(new Date().toISOString().split("T")[0]), margin + doc.getTextWidth(projectName) + 8, 44);
+  doc.text(formatDate(new Date().toISOString().split("T")[0]), margin + doc.getTextWidth(projectName) + 8, 36);
 
   // Episode status summary table
   var epKeys = Object.keys(data.episode_totals);
-  var tableY = 54;
+  var tableY = 44;
 
   // Count statuses per episode
   var epStatusCounts = {};
