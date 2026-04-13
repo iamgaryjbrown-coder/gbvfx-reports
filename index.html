@@ -359,12 +359,11 @@ function buildCostPDF(data, projectName, projectCode, episodes) {
   var margin = 15;
   var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
 
-  // ── Page 1: Summary (Style 3B) ──
+  // ── Page 1: Summary (Style 3B — vertical chart, 3-col info) ──
   // GBVFX Logo (real PNG — 514×107px, ratio 4.8:1)
   try {
     doc.addImage(GBVFX_LOGO, "PNG", margin, 8, 40, 8.3);
   } catch(e) {
-    // Fallback to text logo
     doc.setFontSize(32);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(232, 138, 42);
@@ -373,119 +372,125 @@ function buildCostPDF(data, projectName, projectCode, episodes) {
     doc.text("VFX", margin + doc.getTextWidth("GB"), 18);
   }
 
-  // Orange line under logo (margin to margin)
+  // Orange line under logo (full width margin to margin)
   doc.setDrawColor(232, 138, 42);
   doc.setLineWidth(0.5);
   doc.line(margin, 19, pw - margin, 19);
 
-  // Subtitle
-  doc.setFontSize(14);
-  doc.setTextColor(232, 138, 42);
+  // Subtitle (muted grey, not orange)
+  doc.setFontSize(12);
+  doc.setTextColor(140, 140, 140);
+  doc.setFont("helvetica", "normal");
   doc.text("SUMMARY OF BID / ESTIMATE", margin, 26);
 
-  // Orange line under subtitle (margin to margin)
+  // Orange line under subtitle (full width margin to margin)
   doc.setDrawColor(232, 138, 42);
   doc.setLineWidth(0.5);
   doc.line(margin, 29, pw - margin, 29);
 
-  // Project info
-  doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  var infoY = 34;
-  var col1 = margin, col2 = margin + 32, col3 = pw/2 + 10, col4 = pw/2 + 45;
-
+  // ── 3-column info block ──
   var bidId = document.getElementById("bidIdInput").value || ("GBVFX_" + projectCode + "_" + new Date().toISOString().slice(2,10).replace(/-/g,""));
   var bidDate = document.getElementById("bidDateInput").value || new Date().toISOString().split("T")[0];
   var client = document.getElementById("clientInput").value || "";
   var contact = document.getElementById("contactInput").value || "";
   var projectType = document.getElementById("projectTypeInput").value || "VFX - Episodic";
 
-  doc.setFont("helvetica", "normal");
-  doc.text("Project", col1, infoY);
-  doc.text("Project Type", col1, infoY + 6);
-  doc.text("Bid ID", col1, infoY + 12);
-  doc.text("Bid Date", col1, infoY + 18);
+  var infoY = 36;
+  var infoCol1 = margin;
+  var infoCol2 = margin + 95;
+  var infoCol3 = pw / 2 + 80;
 
-  doc.setFont("helvetica", "bold");
-  doc.text(projectName, col2, infoY);
+  // Row 1: labels
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
   doc.setFont("helvetica", "normal");
-  doc.text(projectType, col2, infoY + 6);
-  doc.text(bidId, col2, infoY + 12);
-  doc.text(formatDate(bidDate), col2, infoY + 18);
+  doc.text("PROJECT", infoCol1, infoY);
+  doc.text("CLIENT", infoCol2, infoY);
+  doc.text("DATE", infoCol3, infoY);
 
+  // Row 1: values
+  doc.setFontSize(10);
+  doc.setTextColor(40, 40, 40);
   doc.setFont("helvetica", "normal");
-  doc.text("Client / Studio", col3, infoY);
-  doc.text("Contact", col3, infoY + 6);
-  doc.setFont("helvetica", "bold");
-  doc.text(client, col4, infoY);
-  doc.setFont("helvetica", "normal");
-  doc.text(contact, col4, infoY + 6);
+  doc.text(projectName + " (" + projectCode + ")", infoCol1, infoY + 6);
+  doc.text(client, infoCol2, infoY + 6);
+  doc.text(formatDate(bidDate), infoCol3, infoY + 6);
 
-  // Episode cost table
-  var tableY = infoY + 28;
+  // Row 2: labels
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text("TYPE", infoCol1, infoY + 15);
+  doc.text("CONTACT", infoCol2, infoY + 15);
+
+  // Row 2: values
+  doc.setFontSize(10);
+  doc.setTextColor(40, 40, 40);
+  doc.text(projectType, infoCol1, infoY + 21);
+  doc.text(contact, infoCol2, infoY + 21);
+
+  // Orange line between info block and tables (full width)
+  doc.setDrawColor(232, 138, 42);
+  doc.setLineWidth(0.5);
+  doc.line(margin, infoY + 26, pw - margin, infoY + 26);
+
+  // ── Episode cost table (left side) ──
+  var tableY = infoY + 32;
   var extraLines = parseExtraLines(document.getElementById("extraLinesInput").value);
   var epKeys = Object.keys(data.episode_totals);
-  var tableW = 120;
+  var tableW = pw / 2 - margin + 5;
   var rowH = 7;
 
-  // Separate special episodes: 000 = Production, 100 = Contingency
   var prodCost = data.episode_totals["000"] || 0;
   var contingency = data.episode_totals["100"] || 0;
   var shotEpisodes = epKeys.filter(function(k) { return k !== "000" && k !== "100"; });
 
-  // Production cost header (from ep 000)
+  // Production row
   if (prodCost > 0) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(margin, tableY, tableW, rowH, "F");
     doc.setTextColor(60, 60, 60);
-    doc.text("PRODUCTION (producer / supervisor / kit)", margin + 3, tableY + 5);
+    doc.text("PRODUCTION", margin + 3, tableY + 5);
     doc.text(fmtGBP(prodCost), margin + tableW - 3, tableY + 5, { align: "right" });
-    tableY += rowH + 2;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
+    tableY += rowH + 1;
   }
 
-  // Episode rows (excluding 000 and 100)
+  // Episode rows
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   shotEpisodes.forEach(function(ep) {
-    doc.setFillColor(252, 252, 252);
-    doc.rect(margin, tableY, tableW, rowH, "F");
-    doc.setDrawColor(230, 230, 230);
-    doc.rect(margin, tableY, tableW, rowH, "S");
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(60, 60, 60);
     doc.text("VFX " + ep, margin + 3, tableY + 5);
     doc.text(fmtGBP(data.episode_totals[ep]), margin + tableW - 3, tableY + 5, { align: "right" });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
     tableY += rowH;
   });
 
-  // Extra line items (manual)
+  // Extra line items
   var extraTotal = 0;
   extraLines.forEach(function(item) {
-    doc.setFillColor(252, 252, 252);
-    doc.rect(margin, tableY, tableW, rowH, "F");
-    doc.setDrawColor(230, 230, 230);
-    doc.rect(margin, tableY, tableW, rowH, "S");
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(60, 60, 60);
     doc.text(item.name.toUpperCase(), margin + 3, tableY + 5);
     doc.text(fmtGBP(item.value), margin + tableW - 3, tableY + 5, { align: "right" });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
     extraTotal += item.value;
     tableY += rowH;
   });
 
-  // Contingency (from ep 100)
+  // Contingency
   if (contingency > 0) {
-    doc.setFillColor(252, 252, 252);
-    doc.rect(margin, tableY, tableW, rowH, "F");
-    doc.setDrawColor(230, 230, 230);
-    doc.rect(margin, tableY, tableW, rowH, "S");
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(60, 60, 60);
     doc.text("CONTINGENCY", margin + 3, tableY + 5);
     doc.text(fmtGBP(contingency), margin + tableW - 3, tableY + 5, { align: "right" });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, tableY + rowH, margin + tableW, tableY + rowH);
     tableY += rowH;
   }
 
-  // Grand total
+  // Grand total (orange filled bar)
   tableY += 2;
   doc.setFillColor(232, 138, 42);
   doc.rect(margin, tableY, tableW, rowH + 2, "F");
@@ -495,43 +500,68 @@ function buildCostPDF(data, projectName, projectCode, episodes) {
   var grandTotal = data.grand_total + extraTotal;
   doc.text("TOTAL", margin + 3, tableY + 6);
   doc.text(fmtGBP(grandTotal), margin + tableW - 3, tableY + 6, { align: "right" });
+  var totalBarBottom = tableY + rowH + 2;
 
-  // Bar chart (if All) — only VFX episodes, not 000/100
+  // ── Vertical bar chart (right side) ──
   if (isAll && shotEpisodes.length > 1) {
-    var chartX = margin + tableW + 10;
-    var chartY = infoY + 28;
-    var chartW = pw - margin - chartX;
-    var chartH = Math.min(120, (shotEpisodes.length + 1) * 16);
     var maxVal = Math.max.apply(null, shotEpisodes.map(function(k) { return data.episode_totals[k]; }));
+    // Round maxVal up to a clean number for axis
+    var magnitude = Math.pow(10, Math.floor(Math.log10(maxVal)));
+    var axisMax = Math.ceil(maxVal / (magnitude / 2)) * (magnitude / 2);
 
-    // Title
+    var chartLeft = pw / 2 + 15;
+    var chartRight = pw - margin;
+    var chartW = chartRight - chartLeft;
+    var yAxisX = chartLeft + 22;
+    var chartTop = infoY + 32;
+    var chartBottom = totalBarBottom;
+    var plotH = chartBottom - chartTop;
+    var plotW = chartRight - yAxisX;
+
+    // Date title above chart
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
     doc.setFont("helvetica", "normal");
-    doc.text(formatDate(bidDate), chartX + chartW / 2, chartY - 3, { align: "center" });
+    doc.text(formatDate(bidDate), yAxisX + plotW / 2, chartTop - 5, { align: "center" });
 
-    // Y axis labels
-    var barH = Math.min(14, (chartH - 10) / shotEpisodes.length - 2);
-    var barAreaW = chartW - 50;
+    // Y-axis gridlines and labels
+    var numTicks = 4;
+    for (var t = 0; t <= numTicks; t++) {
+      var tickVal = axisMax * t / numTicks;
+      var tickY = chartBottom - (t / numTicks) * plotH;
+      doc.setFontSize(6);
+      doc.setTextColor(140, 140, 140);
+      doc.text(fmtGBP(tickVal), chartLeft + 20, tickY + 1, { align: "right" });
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.2);
+      doc.line(yAxisX, tickY, chartRight, tickY);
+    }
+
+    // Bars
+    var nBars = shotEpisodes.length;
+    var barSlot = plotW / nBars;
+    var barW = barSlot * 0.6;
+    var barGap = barSlot * 0.2;
 
     shotEpisodes.forEach(function(ep, i) {
-      var by = chartY + 5 + i * (barH + 3);
       var val = data.episode_totals[ep];
-      var bw = maxVal > 0 ? (val / maxVal) * barAreaW : 0;
+      var barH = (val / axisMax) * plotH;
+      var bx = yAxisX + i * barSlot + barGap;
+      var by = chartBottom - barH;
 
-      // Label
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      doc.text("VFX " + ep, chartX, by + barH / 2 + 1);
+      // Bar (slate grey)
+      doc.setFillColor(150, 160, 172);
+      doc.rect(bx, by, barW, barH, "F");
 
-      // Bar
-      doc.setFillColor(74, 130, 196);
-      doc.rect(chartX + 28, by, bw, barH, "F");
-
-      // Value
+      // Value above bar
       doc.setFontSize(7);
-      doc.setTextColor(80, 80, 80);
-      doc.text(fmtGBP(val), chartX + 30 + bw, by + barH / 2 + 1);
+      doc.setTextColor(60, 60, 60);
+      doc.text(fmtGBP(val), bx + barW / 2, by - 2, { align: "center" });
+
+      // Episode label below
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text("VFX " + ep, bx + barW / 2, chartBottom + 5, { align: "center" });
     });
   }
 
