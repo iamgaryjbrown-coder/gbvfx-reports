@@ -88,6 +88,7 @@
   <div class="card-title">Include Columns</div>
   <div class="check-group">
     <label><input type="checkbox" id="colCost" checked> Cost</label>
+    <label><input type="checkbox" id="colNotes" checked> Quick Notes</label>
     <label><input type="checkbox" id="colVers"> Vers EDIT</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
   </div>
@@ -305,6 +306,7 @@ async function generateReport() {
   var shotEpisodes = getSelectedEpisodes("shotEp");
 
   var showCost = document.getElementById("colCost").checked;
+  var showNotes = document.getElementById("colNotes").checked;
   var showVers = document.getElementById("colVers").checked;
   var showExr = document.getElementById("colExr").checked;
   var showProd = false;
@@ -335,6 +337,7 @@ async function generateReport() {
       summary_episodes: summaryEpisodes,
       shot_episodes: shotEpisodes,
       show_cost: showCost,
+      show_notes: showNotes,
       show_vers: showVers,
       show_exr: showExr,
       show_prod: showProd,
