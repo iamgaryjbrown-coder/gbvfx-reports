@@ -70,8 +70,14 @@
     </select>
   </div>
   <div class="field">
-    <label>Episodes</label>
+    <label>Summary Page — Episodes</label>
     <div class="episode-grid" id="episodeGrid">
+      <span style="color:var(--text-dim);font-size:13px;">Select a project first</span>
+    </div>
+  </div>
+  <div class="field" style="margin-top:12px;">
+    <label>Shot Detail Pages — Episodes</label>
+    <div class="episode-grid" id="shotEpisodeGrid">
       <span style="color:var(--text-dim);font-size:13px;">Select a project first</span>
     </div>
   </div>
@@ -227,30 +233,46 @@ async function onProjectChange() {
 }
 
 function renderEpisodes() {
+  // Summary episodes
   var grid = document.getElementById("episodeGrid");
-  var html = '<label class="ep-check all-check"><input type="checkbox" id="epAll" onchange="toggleAll()" checked> All</label>';
+  var html = '<label class="ep-check all-check"><input type="checkbox" id="epAll" onchange="toggleAll(\'ep\')" checked> All</label>';
   EPISODES.forEach(function(ep) {
-    html += '<label class="ep-check"><input type="checkbox" class="ep-cb" value="' + ep.code + '" checked onchange="checkEpSelection()"> ' + ep.code + '</label>';
+    html += '<label class="ep-check"><input type="checkbox" class="ep-cb" value="' + ep.code + '" checked onchange="checkEpSelection(\'ep\')"> ' + ep.code + '</label>';
   });
   grid.innerHTML = html;
+
+  // Shot detail episodes
+  var grid2 = document.getElementById("shotEpisodeGrid");
+  var html2 = '<label class="ep-check all-check"><input type="checkbox" id="shotEpAll" onchange="toggleAll(\'shotEp\')" checked> All</label>';
+  EPISODES.forEach(function(ep) {
+    html2 += '<label class="ep-check"><input type="checkbox" class="shotep-cb" value="' + ep.code + '" checked onchange="checkEpSelection(\'shotEp\')"> ' + ep.code + '</label>';
+  });
+  grid2.innerHTML = html2;
+
   document.getElementById("generateBtn").disabled = false;
 }
 
-function toggleAll() {
-  var checked = document.getElementById("epAll").checked;
-  document.querySelectorAll(".ep-cb").forEach(function(cb) { cb.checked = checked; });
+function toggleAll(prefix) {
+  var allId = prefix === "shotEp" ? "shotEpAll" : "epAll";
+  var cls = prefix === "shotEp" ? ".shotep-cb" : ".ep-cb";
+  var checked = document.getElementById(allId).checked;
+  document.querySelectorAll(cls).forEach(function(cb) { cb.checked = checked; });
 }
 
-function checkEpSelection() {
-  var all = document.querySelectorAll(".ep-cb");
-  var checked = document.querySelectorAll(".ep-cb:checked");
-  document.getElementById("epAll").checked = (all.length === checked.length);
+function checkEpSelection(prefix) {
+  var allId = prefix === "shotEp" ? "shotEpAll" : "epAll";
+  var cls = prefix === "shotEp" ? ".shotep-cb" : ".ep-cb";
+  var all = document.querySelectorAll(cls);
+  var checked = document.querySelectorAll(cls + ":checked");
+  document.getElementById(allId).checked = (all.length === checked.length);
 }
 
-function getSelectedEpisodes() {
-  if (document.getElementById("epAll") && document.getElementById("epAll").checked) return ["all"];
+function getSelectedEpisodes(prefix) {
+  var allId = prefix === "shotEp" ? "shotEpAll" : "epAll";
+  var cls = prefix === "shotEp" ? ".shotep-cb" : ".ep-cb";
+  if (document.getElementById(allId) && document.getElementById(allId).checked) return ["all"];
   var selected = [];
-  document.querySelectorAll(".ep-cb:checked").forEach(function(cb) { selected.push(cb.value); });
+  document.querySelectorAll(cls + ":checked").forEach(function(cb) { selected.push(cb.value); });
   return selected.length > 0 ? selected : ["all"];
 }
 
@@ -279,19 +301,23 @@ async function generateReport() {
   var projectId = parseInt(sel.value);
   var projectCode = sel.options[sel.selectedIndex].dataset.code;
   var projectName = sel.options[sel.selectedIndex].text;
-  var episodes = getSelectedEpisodes();
+  var summaryEpisodes = getSelectedEpisodes("ep");
+  var shotEpisodes = getSelectedEpisodes("shotEp");
 
   var showCost = document.getElementById("colCost").checked;
   var showVers = document.getElementById("colVers").checked;
   var showExr = document.getElementById("colExr").checked;
   var showProd = document.getElementById("colProd").checked;
 
+  // Fetch all episodes so server has full data, filtering happens server-side
+  var fetchEpisodes = "all";
+
   try {
     // Step 1: fetch shot data
     btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
     var data = await apiFetch("/api/reports/shots", {
       method: "POST",
-      body: JSON.stringify({ project_id: projectId, episodes: episodes }),
+      body: JSON.stringify({ project_id: projectId, episodes: [fetchEpisodes] }),
     });
 
     // Step 2: build payload
@@ -305,6 +331,8 @@ async function generateReport() {
       episode_totals: data.episode_totals,
       grand_total: data.grand_total,
       shots: data.shots,
+      summary_episodes: summaryEpisodes,
+      shot_episodes: shotEpisodes,
       show_cost: showCost,
       show_vers: showVers,
       show_exr: showExr,
