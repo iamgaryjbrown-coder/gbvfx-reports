@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GBVFX Reports</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --card: #222;
+    --border: #333;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --accent: #4a9eff;
+    --accent-hover: #6ab4ff;
+    --orange: #e88a2a;
+    --green: #2ecc71;
+    --red: #e74c3c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px;
+    max-width: 900px; margin: 0 auto;
+  }
+  .logo { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+  .logo span.gb { color: var(--orange); }
+  .logo span.vfx { color: #999; }
+  h1 { font-size: 16px; color: var(--text-dim); font-weight: 400; margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--text);
+    font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { margin-bottom: 12px; }
+  .radio-group { display: flex; gap: 12px; margin-bottom: 12px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 14px; color: var(--text); transition: all 0.15s;
+  }
+  .radio-group input[type="radio"] { width: auto; accent-color: var(--accent); }
+  .radio-group label:has(input:checked) { border-color: var(--accent); background: rgba(74, 158, 255, 0.1); }
+  .episode-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .ep-check {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 13px; transition: all 0.15s; user-select: none;
+  }
+  .ep-check:has(input:checked) { border-color: var(--accent); background: rgba(74, 158, 255, 0.1); }
+  .ep-check.all-check:has(input:checked) { border-color: var(--orange); background: rgba(232, 138, 42, 0.15); }
+  .ep-check input { width: auto; accent-color: var(--accent); }
+  .btn {
+    padding: 12px 28px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { background: #555; cursor: not-allowed; }
+  .status { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
+  .status.error { color: var(--red); }
+  .status.success { color: var(--green); }
+  .token-bar {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 20px;
+    padding: 12px 16px; background: var(--surface); border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .token-bar input { flex: 1; }
+  .token-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .token-bar .dot.ok { background: var(--green); }
+  .token-bar button {
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--card); color: var(--text); cursor: pointer; font-size: 13px;
+  }
+  .hidden { display: none; }
+  .loading { opacity: 0.5; pointer-events: none; }
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cost-fields { transition: max-height 0.3s, opacity 0.3s; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div class="logo"><span class="gb">GB</span><span class="vfx">VFX</span></div>
+<h1>ShotGrid Report Generator</h1>
+
+<!-- Token Bar -->
+<div class="token-bar">
+  <div class="dot" id="connDot"></div>
+  <input type="password" id="tokenInput" placeholder="API Token" autocomplete="off">
+  <button onclick="saveToken()">Connect</button>
+</div>
+
+<!-- Project & Report Type -->
+<div class="card">
+  <div class="card-title">Report Setup</div>
+  <div class="row">
+    <div class="field">
+      <label>Project</label>
+      <select id="projectSelect" onchange="onProjectChange()">
+        <option value="">Select project...</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Report Type</label>
+      <div class="radio-group">
+        <label><input type="radio" name="reportType" value="cost" checked onchange="onTypeChange()"> Cost</label>
+        <label><input type="radio" name="reportType" value="status" onchange="onTypeChange()"> Status</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Episodes</label>
+    <div class="episode-grid" id="episodeGrid">
+      <span style="color:var(--text-dim);font-size:13px;">Select a project first</span>
+    </div>
+  </div>
+</div>
+
+<!-- Cost Report Fields -->
+<div class="card cost-fields" id="costFields">
+  <div class="card-title">Cost Report Details</div>
+  <div class="row">
+    <div class="field">
+      <label>Client / Studio</label>
+      <input type="text" id="clientInput" placeholder="e.g. Harbour Pictures">
+    </div>
+    <div class="field">
+      <label>Contact</label>
+      <input type="text" id="contactInput" placeholder="e.g. Mark Hedges">
+    </div>
+  </div>
+  <div class="row-3">
+    <div class="field">
+      <label>Bid ID</label>
+      <input type="text" id="bidIdInput" placeholder="Auto-generated">
+    </div>
+    <div class="field">
+      <label>Bid Date</label>
+      <input type="date" id="bidDateInput">
+    </div>
+    <div class="field">
+      <label>Project Type</label>
+      <input type="text" id="projectTypeInput" value="VFX - Episodic">
+    </div>
+  </div>
+  <div class="row-3">
+    <div class="field">
+      <label>Production Cost (£)</label>
+      <input type="number" id="productionCostInput" value="0" min="0">
+    </div>
+    <div class="field">
+      <label>Contingency (£)</label>
+      <input type="number" id="contingencyInput" value="0" min="0">
+    </div>
+    <div class="field">
+      <label>Additional Line Items</label>
+      <input type="text" id="extraLinesInput" placeholder='e.g. Phoenix:30000'>
+    </div>
+  </div>
+</div>
+
+<!-- Generate -->
+<div class="card">
+  <button class="btn btn-primary" id="generateBtn" onclick="generateReport()" disabled>
+    Generate PDF
+  </button>
+  <div class="status" id="statusMsg"></div>
+</div>
+
+<script>
+// ── Config ──
+const API_BASE = "https://deliver.gbvfx.com";
+let TOKEN = localStorage.getItem("gbvfx_report_token") || "";
+let PROJECTS = [];
+let EPISODES = [];
+let SHOT_DATA = null;
+
+// ── Init ──
+document.getElementById("tokenInput").value = TOKEN ? "••••••••" : "";
+document.getElementById("bidDateInput").value = new Date().toISOString().split("T")[0];
+if (TOKEN) {
+  document.getElementById("connDot").classList.add("ok");
+  loadProjects();
+}
+
+function saveToken() {
+  const inp = document.getElementById("tokenInput");
+  const val = inp.value.trim();
+  if (!val || val === "••••••••") return;
+  TOKEN = val;
+  localStorage.setItem("gbvfx_report_token", TOKEN);
+  inp.value = "••••••••";
+  document.getElementById("connDot").classList.add("ok");
+  loadProjects();
+}
+
+// ── API ──
+async function apiFetch(path, options) {
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      "Authorization": "Bearer " + TOKEN,
+      "Content-Type": "application/json",
+      ...(options && options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error("API " + res.status + ": " + txt);
+  }
+  return res.json();
+}
+
+async function loadProjects() {
+  try {
+    const data = await apiFetch("/api/reports/projects");
+    PROJECTS = data.projects;
+    const sel = document.getElementById("projectSelect");
+    sel.innerHTML = '<option value="">Select project...</option>';
+    PROJECTS.forEach(function(p) {
+      sel.innerHTML += '<option value="' + p.id + '" data-code="' + p.code + '">' + p.name + ' (' + p.code + ')</option>';
+    });
+  } catch (e) {
+    setStatus("Failed to load projects: " + e.message, "error");
+    document.getElementById("connDot").classList.remove("ok");
+  }
+}
+
+async function onProjectChange() {
+  const sel = document.getElementById("projectSelect");
+  const pid = sel.value;
+  if (!pid) {
+    document.getElementById("episodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
+    document.getElementById("generateBtn").disabled = true;
+    return;
+  }
+  const code = sel.options[sel.selectedIndex].dataset.code;
+  document.getElementById("bidIdInput").placeholder = "GBVFX_" + code + "_" + new Date().toISOString().slice(2,10).replace(/-/g,"");
+
+  try {
+    const data = await apiFetch("/api/reports/episodes?project_id=" + pid);
+    EPISODES = data.episodes;
+    renderEpisodes();
+  } catch (e) {
+    setStatus("Failed to load episodes: " + e.message, "error");
+  }
+}
+
+function renderEpisodes() {
+  const grid = document.getElementById("episodeGrid");
+  var html = '<label class="ep-check all-check"><input type="checkbox" id="epAll" onchange="toggleAll()"> All</label>';
+  EPISODES.forEach(function(ep) {
+    html += '<label class="ep-check"><input type="checkbox" class="ep-cb" value="' + ep.code + '" onchange="checkEpSelection()"> ' + ep.code + '</label>';
+  });
+  grid.innerHTML = html;
+  document.getElementById("generateBtn").disabled = false;
+}
+
+function toggleAll() {
+  var checked = document.getElementById("epAll").checked;
+  document.querySelectorAll(".ep-cb").forEach(function(cb) { cb.checked = checked; });
+}
+
+function checkEpSelection() {
+  var all = document.querySelectorAll(".ep-cb");
+  var checked = document.querySelectorAll(".ep-cb:checked");
+  document.getElementById("epAll").checked = (all.length === checked.length);
+}
+
+function getSelectedEpisodes() {
+  if (document.getElementById("epAll") && document.getElementById("epAll").checked) return ["all"];
+  var selected = [];
+  document.querySelectorAll(".ep-cb:checked").forEach(function(cb) { selected.push(cb.value); });
+  return selected.length > 0 ? selected : ["all"];
+}
+
+function onTypeChange() {
+  var type = document.querySelector('input[name="reportType"]:checked').value;
+  document.getElementById("costFields").style.display = (type === "cost") ? "block" : "none";
+}
+
+function setStatus(msg, cls) {
+  var el = document.getElementById("statusMsg");
+  el.textContent = msg;
+  el.className = "status" + (cls ? " " + cls : "");
+}
+
+// ── Report Generation ──
+async function generateReport() {
+  var btn = document.getElementById("generateBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Fetching data...';
+  setStatus("");
+
+  var type = document.querySelector('input[name="reportType"]:checked').value;
+  var sel = document.getElementById("projectSelect");
+  var projectId = parseInt(sel.value);
+  var projectCode = sel.options[sel.selectedIndex].dataset.code;
+  var projectName = sel.options[sel.selectedIndex].text;
+  var episodes = getSelectedEpisodes();
+
+  try {
+    btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
+    var data = await apiFetch("/api/reports/shots", {
+      method: "POST",
+      body: JSON.stringify({ project_id: projectId, episodes: episodes }),
+    });
+    SHOT_DATA = data;
+
+    btn.innerHTML = '<span class="spinner"></span>Generating PDF...';
+    await new Promise(function(r) { setTimeout(r, 100); }); // let UI update
+
+    if (type === "cost") {
+      buildCostPDF(data, projectName, projectCode, episodes);
+    } else {
+      buildStatusPDF(data, projectName, projectCode, episodes);
+    }
+
+    setStatus("PDF generated successfully!", "success");
+  } catch (e) {
+    setStatus("Error: " + e.message, "error");
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate PDF";
+  }
+}
+
+// ── Cost PDF ──
+function buildCostPDF(data, projectName, projectCode, episodes) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  var pw = 297, ph = 210; // A4 landscape mm
+  var margin = 15;
+  var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
+
+  // ── Page 1: Summary ──
+  // GBVFX Logo
+  doc.setFontSize(32);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(232, 138, 42); // orange
+  doc.text("GB", margin, 22);
+  var gbW = doc.getTextWidth("GB");
+  doc.setTextColor(153, 153, 153); // grey
+  doc.text("VFX", margin + gbW, 22);
+
+  // Title
+  doc.setFontSize(14);
+  doc.setTextColor(232, 138, 42);
+  doc.text("SUMMARY OF BID / ESTIMATE", margin, 32);
+
+  // Divider line
+  doc.setDrawColor(232, 138, 42);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 35, pw - margin, 35);
+
+  // Project info
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  var infoY = 43;
+  var col1 = margin, col2 = margin + 32, col3 = pw/2 + 10, col4 = pw/2 + 45;
+
+  var bidId = document.getElementById("bidIdInput").value || ("GBVFX_" + projectCode + "_" + new Date().toISOString().slice(2,10).replace(/-/g,""));
+  var bidDate = document.getElementById("bidDateInput").value || new Date().toISOString().split("T")[0];
+  var client = document.getElementById("clientInput").value || "";
+  var contact = document.getElementById("contactInput").value || "";
+  var projectType = document.getElementById("projectTypeInput").value || "VFX - Episodic";
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Project", col1, infoY);
+  doc.text("Project Type", col1, infoY + 6);
+  doc.text("Bid ID", col1, infoY + 12);
+  doc.text("Bid Date", col1, infoY + 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.text(projectName, col2, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(projectType, col2, infoY + 6);
+  doc.text(bidId, col2, infoY + 12);
+  doc.text(formatDate(bidDate), col2, infoY + 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Client / Studio", col3, infoY);
+  doc.text("Contact", col3, infoY + 6);
+  doc.setFont("helvetica", "bold");
+  doc.text(client, col4, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(contact, col4, infoY + 6);
+
+  // Episode cost table
+  var tableY = infoY + 28;
+  var prodCost = parseFloat(document.getElementById("productionCostInput").value) || 0;
+  var contingency = parseFloat(document.getElementById("contingencyInput").value) || 0;
+  var extraLines = parseExtraLines(document.getElementById("extraLinesInput").value);
+
+  var epKeys = Object.keys(data.episode_totals);
+  var tableW = 120;
+  var rowH = 7;
+
+  // Production cost header
+  if (prodCost > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(margin, tableY, tableW, rowH, "F");
+    doc.setTextColor(60, 60, 60);
+    doc.text("PRODUCTION (producer / supervisor / kit)", margin + 3, tableY + 5);
+    doc.text(fmtGBP(prodCost), margin + tableW - 3, tableY + 5, { align: "right" });
+    tableY += rowH + 2;
+  }
+
+  // Episode rows
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  epKeys.forEach(function(ep) {
+    doc.setFillColor(252, 252, 252);
+    doc.rect(margin, tableY, tableW, rowH, "F");
+    doc.setDrawColor(230, 230, 230);
+    doc.rect(margin, tableY, tableW, rowH, "S");
+    doc.setTextColor(80, 80, 80);
+    doc.text("VFX " + ep, margin + 3, tableY + 5);
+    doc.text(fmtGBP(data.episode_totals[ep]), margin + tableW - 3, tableY + 5, { align: "right" });
+    tableY += rowH;
+  });
+
+  // Extra line items
+  var extraTotal = 0;
+  extraLines.forEach(function(item) {
+    doc.setFillColor(252, 252, 252);
+    doc.rect(margin, tableY, tableW, rowH, "F");
+    doc.setDrawColor(230, 230, 230);
+    doc.rect(margin, tableY, tableW, rowH, "S");
+    doc.setTextColor(80, 80, 80);
+    doc.text(item.name.toUpperCase(), margin + 3, tableY + 5);
+    doc.text(fmtGBP(item.value), margin + tableW - 3, tableY + 5, { align: "right" });
+    extraTotal += item.value;
+    tableY += rowH;
+  });
+
+  // Contingency
+  if (contingency > 0) {
+    doc.setFillColor(252, 252, 252);
+    doc.rect(margin, tableY, tableW, rowH, "F");
+    doc.setDrawColor(230, 230, 230);
+    doc.rect(margin, tableY, tableW, rowH, "S");
+    doc.setTextColor(80, 80, 80);
+    doc.text("CONTINGENCY", margin + 3, tableY + 5);
+    doc.text(fmtGBP(contingency), margin + tableW - 3, tableY + 5, { align: "right" });
+    tableY += rowH;
+  }
+
+  // Grand total
+  tableY += 2;
+  doc.setFillColor(232, 138, 42);
+  doc.rect(margin, tableY, tableW, rowH + 2, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  var grandTotal = data.grand_total + prodCost + contingency + extraTotal;
+  doc.text("TOTAL", margin + 3, tableY + 6);
+  doc.text(fmtGBP(grandTotal), margin + tableW - 3, tableY + 6, { align: "right" });
+
+  // Bar chart (if All)
+  if (isAll && epKeys.length > 1) {
+    var chartX = margin + tableW + 20;
+    var chartY = infoY + 28;
+    var chartW = pw - margin - chartX;
+    var chartH = Math.min(120, (epKeys.length + 1) * 16);
+    var maxVal = Math.max.apply(null, epKeys.map(function(k) { return data.episode_totals[k]; }));
+
+    // Title
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont("helvetica", "normal");
+    doc.text(formatDate(bidDate), chartX + chartW / 2, chartY - 3, { align: "center" });
+
+    // Y axis labels
+    var barH = Math.min(14, (chartH - 10) / epKeys.length - 2);
+    var barAreaW = chartW - 50;
+
+    epKeys.forEach(function(ep, i) {
+      var by = chartY + 5 + i * (barH + 3);
+      var val = data.episode_totals[ep];
+      var bw = maxVal > 0 ? (val / maxVal) * barAreaW : 0;
+
+      // Label
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text("VFX " + ep, chartX, by + barH / 2 + 1);
+
+      // Bar
+      doc.setFillColor(74, 130, 196);
+      doc.rect(chartX + 28, by, bw, barH, "F");
+
+      // Value
+      doc.setFontSize(7);
+      doc.setTextColor(80, 80, 80);
+      doc.text(fmtGBP(val), chartX + 30 + bw, by + barH / 2 + 1);
+    });
+  }
+
+  // Date footer
+  doc.setFontSize(7);
+  doc.setTextColor(180, 180, 180);
+  doc.text("Generated " + new Date().toLocaleDateString("en-GB"), pw - margin, ph - 8, { align: "right" });
+
+  // ── Shot Detail Pages ──
+  addShotPages(doc, data, "cost");
+
+  // Download
+  var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  doc.save("GBVFX_" + projectCode + "_Cost_Report_" + dateStr + ".pdf");
+}
+
+// ── Status PDF ──
+function buildStatusPDF(data, projectName, projectCode, episodes) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  var pw = 297, ph = 210;
+  var margin = 15;
+  var isAll = (episodes[0] === "all" || episodes.length === EPISODES.length);
+
+  // Header
+  doc.setFontSize(32);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(232, 138, 42);
+  doc.text("GB", margin, 22);
+  var gbW = doc.getTextWidth("GB");
+  doc.setTextColor(153, 153, 153);
+  doc.text("VFX", margin + gbW, 22);
+
+  doc.setFontSize(14);
+  doc.setTextColor(232, 138, 42);
+  doc.text("STATUS REPORT", margin, 32);
+
+  doc.setDrawColor(232, 138, 42);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 35, pw - margin, 35);
+
+  // Project info
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.setFont("helvetica", "bold");
+  doc.text(projectName, margin, 44);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(formatDate(new Date().toISOString().split("T")[0]), margin + doc.getTextWidth(projectName) + 8, 44);
+
+  // Episode status summary table
+  var epKeys = Object.keys(data.episode_totals);
+  var tableY = 54;
+
+  // Count statuses per episode
+  var epStatusCounts = {};
+  var allStatuses = new Set();
+  data.shots.forEach(function(s) {
+    if (!epStatusCounts[s.episode]) epStatusCounts[s.episode] = {};
+    var st = s.status || "unknown";
+    allStatuses.add(st);
+    epStatusCounts[s.episode][st] = (epStatusCounts[s.episode][st] || 0) + 1;
+  });
+  var statusList = Array.from(allStatuses).sort();
+
+  // Table header
+  var cols = [{ header: "Episode", dataKey: "ep" }, { header: "Shots", dataKey: "total" }];
+  statusList.forEach(function(st) { cols.push({ header: statusLabel(st), dataKey: st }); });
+
+  var rows = [];
+  epKeys.forEach(function(ep) {
+    var row = { ep: ep, total: 0 };
+    statusList.forEach(function(st) {
+      var c = (epStatusCounts[ep] && epStatusCounts[ep][st]) || 0;
+      row[st] = c || "";
+      row.total += c;
+    });
+    rows.push(row);
+  });
+
+  doc.autoTable({
+    startY: tableY,
+    head: [cols.map(function(c) { return c.header; })],
+    body: rows.map(function(r) { return cols.map(function(c) { return r[c.dataKey]; }); }),
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [232, 138, 42], textColor: [255, 255, 255], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    theme: "grid",
+  });
+
+  // Shot detail pages
+  addShotPages(doc, data, "status");
+
+  var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  doc.save("GBVFX_" + projectCode + "_Status_Report_" + dateStr + ".pdf");
+}
+
+// ── Shared: Shot Detail Pages ──
+function addShotPages(doc, data, type) {
+  var pw = 297, ph = 210, margin = 15;
+
+  // Group shots by episode
+  var grouped = {};
+  data.shots.forEach(function(s) {
+    if (!grouped[s.episode]) grouped[s.episode] = [];
+    grouped[s.episode].push(s);
+  });
+
+  var epKeys = Object.keys(grouped).sort();
+
+  epKeys.forEach(function(ep) {
+    doc.addPage("a4", "landscape");
+    var shots = grouped[ep];
+
+    // Episode header
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(232, 138, 42);
+    doc.text("Episode " + ep, margin, 14);
+
+    // Shot count
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont("helvetica", "normal");
+    doc.text(shots.length + " shot" + (shots.length !== 1 ? "s" : ""), margin + doc.getTextWidth("Episode " + ep + "  "), 14);
+
+    // Build table data
+    var head, colStyles, bodyRows;
+
+    if (type === "cost") {
+      head = [["", "Shot Code", "Description", "Notes", "Status", "Cost"]];
+      colStyles = {
+        0: { cellWidth: 22 },  // thumbnail
+        1: { cellWidth: 35 },  // shot code
+        2: { cellWidth: 100 }, // description
+        3: { cellWidth: 55 },  // notes
+        4: { cellWidth: 25 },  // status
+        5: { cellWidth: 22, halign: "right" },  // cost
+      };
+    } else {
+      head = [["", "Shot Code", "Description", "Notes", "Status"]];
+      colStyles = {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 110 },
+        3: { cellWidth: 60 },
+        4: { cellWidth: 32 },
+      };
+    }
+
+    bodyRows = shots.map(function(s) {
+      var row = [
+        "", // thumbnail placeholder
+        s.code,
+        s.description || "",
+        s.notes || "",
+        statusLabel(s.status),
+      ];
+      if (type === "cost") row.push(s.cost ? fmtGBP(s.cost) : "");
+      return row;
+    });
+
+    // Thumbnail images keyed by row index
+    var thumbMap = {};
+    shots.forEach(function(s, i) {
+      if (s.thumbnail_b64) thumbMap[i] = s.thumbnail_b64;
+    });
+
+    doc.autoTable({
+      startY: 18,
+      head: head,
+      body: bodyRows,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 7.5, cellPadding: 2, minCellHeight: 14, valign: "middle", overflow: "linebreak" },
+      headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      columnStyles: colStyles,
+      theme: "grid",
+      didDrawCell: function(hookData) {
+        if (hookData.section === "body" && hookData.column.index === 0) {
+          var img = thumbMap[hookData.row.index];
+          if (img) {
+            try {
+              doc.addImage(img, "JPEG",
+                hookData.cell.x + 1, hookData.cell.y + 1,
+                20, 11);
+            } catch (e) { /* skip broken thumbs */ }
+          }
+        }
+        // Status badge colouring
+        var statusColIdx = (type === "cost") ? 4 : 4;
+        if (hookData.section === "body" && hookData.column.index === statusColIdx) {
+          var statusText = hookData.cell.raw;
+          var colour = statusColour(statusText);
+          if (colour) {
+            var cx = hookData.cell.x + 2;
+            var cy = hookData.cell.y + hookData.cell.height / 2 - 3;
+            var bw = Math.min(hookData.cell.width - 4, doc.getTextWidth(statusText) + 6);
+            doc.setFillColor(colour[0], colour[1], colour[2]);
+            doc.roundedRect(cx, cy, bw, 6, 1, 1, "F");
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(6.5);
+            doc.text(statusText, cx + bw / 2, cy + 4.2, { align: "center" });
+          }
+        }
+      },
+    });
+
+    // Episode total (cost only)
+    if (type === "cost" && data.episode_totals[ep]) {
+      var finalY = doc.lastAutoTable.finalY || (ph - 20);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(60, 60, 60);
+      doc.text("Episode " + ep + " Total: " + fmtGBP(data.episode_totals[ep]),
+        pw - margin, finalY + 8, { align: "right" });
+    }
+
+    // Page footer
+    doc.setFontSize(7);
+    doc.setTextColor(180, 180, 180);
+    doc.setFont("helvetica", "normal");
+    doc.text("Generated " + new Date().toLocaleDateString("en-GB"), pw - margin, ph - 5, { align: "right" });
+  });
+}
+
+// ── Helpers ──
+function fmtGBP(v) {
+  if (!v && v !== 0) return "";
+  return "\u00A3" + Number(v).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  var parts = d.split("-");
+  var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return parseInt(parts[2]) + " " + months[parseInt(parts[1]) - 1] + " " + parts[0];
+}
+
+function parseExtraLines(str) {
+  if (!str || !str.trim()) return [];
+  return str.split(",").map(function(item) {
+    var parts = item.trim().split(":");
+    if (parts.length === 2) return { name: parts[0].trim(), value: parseFloat(parts[1]) || 0 };
+    return null;
+  }).filter(Boolean);
+}
+
+var STATUS_MAP = {
+  "bid": "Bidding", "omt": "Omit", "hld": "Hold",
+  "ip": "In Progress", "rdy": "Ready to Start",
+  "rev": "Pending Review", "vwd": "Viewed",
+  "notes": "Notes", "aprv": "Approved",
+  "na": "N/A", "fin": "Final",
+  "dlvr": "Delivered", "send": "Send",
+  "4rv": "For Review", "sndexr": "Send EXR",
+  "exr": "EXR Sent", "xrnap": "EXR Not Approved",
+  "wtg": "Waiting", "cbb": "CBB",
+};
+
+function statusLabel(code) {
+  return STATUS_MAP[code] || code || "";
+}
+
+var STATUS_COLOURS = {
+  "Bidding": [158, 158, 158],
+  "In Progress": [33, 150, 243],
+  "Pending Review": [156, 39, 176],
+  "For Review": [156, 39, 176],
+  "Approved": [76, 175, 80],
+  "Final": [76, 175, 80],
+  "Notes": [255, 152, 0],
+  "Delivered": [0, 150, 136],
+  "Send": [0, 188, 212],
+  "Send EXR": [0, 188, 212],
+  "EXR Sent": [139, 195, 74],
+  "EXR Not Approved": [244, 67, 54],
+  "Omit": [96, 125, 139],
+  "Hold": [121, 85, 72],
+  "Ready to Start": [63, 81, 181],
+  "Waiting": [255, 193, 7],
+  "Viewed": [103, 58, 183],
+  "CBB": [158, 158, 158],
+  "N/A": [189, 189, 189],
+};
+
+function statusColour(label) {
+  return STATUS_COLOURS[label] || null;
+}
+</script>
+</body>
+</html>
