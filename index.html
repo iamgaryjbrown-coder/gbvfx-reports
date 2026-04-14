@@ -91,6 +91,7 @@
     <label><input type="checkbox" id="colNotes" checked> Quick Notes</label>
     <label><input type="checkbox" id="colVers"> Vers EDIT</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
+    <label><input type="checkbox" id="colPresentNext"> Present Next Ver</label>
   </div>
 </div>
 
@@ -301,6 +302,7 @@ async function generateReport() {
   var showNotes = document.getElementById("colNotes").checked;
   var showVers = document.getElementById("colVers").checked;
   var showExr = document.getElementById("colExr").checked;
+  var showPresentNext = document.getElementById("colPresentNext").checked;
   var showProd = false;
 
   try {
@@ -332,6 +334,7 @@ async function generateReport() {
       show_notes: showNotes,
       show_vers: showVers,
       show_exr: showExr,
+      show_present_next: showPresentNext,
       show_prod: showProd,
     };
 
