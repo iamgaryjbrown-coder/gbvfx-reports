@@ -180,10 +180,10 @@ async function loadProjects() {
   sel.innerHTML = html;
 }
 
-function resolveContact(code) {
-  // Read sg_forms_contact preference from contacts form localStorage
+async function resolveContact(code) {
+  // Read from server-side contacts (shared across all machines)
   try {
-    var contacts = JSON.parse(localStorage.getItem("gbvfx_contacts_v2") || "{}");
+    var contacts = await apiFetch("/api/reports/contacts");
     var proj = contacts[code];
     if (!proj) return null;
     var pref = proj.sg_forms_contact; // "producer" or "pps"
@@ -207,8 +207,8 @@ async function onProjectChange() {
   var opt = sel.options[sel.selectedIndex];
   var code = opt.dataset.code;
 
-  // Resolve contact from sg_forms_contact preference, fallback to API data
-  var resolved = resolveContact(code);
+  // Resolve contact from server-side contacts, fallback to API data
+  var resolved = await resolveContact(code);
   if (resolved) {
     document.getElementById("clientInput").value = resolved.client;
     document.getElementById("contactInput").value = resolved.contact;
