@@ -322,7 +322,7 @@ async function generateReport() {
       client: document.getElementById("clientInput").value || "",
       contact: document.getElementById("contactInput").value || "",
       bid_date: document.getElementById("bidDateInput").value || new Date().toISOString().split("T")[0],
-      extra_lines: parseExtraLines(document.getElementById("extraLinesInput").value),
+      extra_lines: parseExtraLines((document.getElementById("extraLinesInput") || {}).value || ""),
       episode_totals: data.episode_totals,
       grand_total: data.grand_total,
       shots: data.shots,
