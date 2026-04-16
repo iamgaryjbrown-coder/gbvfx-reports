@@ -314,11 +314,13 @@ async function generateReport() {
   var showPresentNext = document.getElementById("colPresentNext").checked;
   var showInvoiced = document.getElementById("colInvoiced").checked;
   var showProd = false;
+  var filterUninvoiced = document.getElementById("filterUninvoiced").checked;
+  var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  var reportType = filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status");
 
   try {
     // Step 1: fetch shot data — pass shot_episodes so thumbnails only download for those
     btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
-    var filterUninvoiced = document.getElementById("filterUninvoiced").checked;
     var data = await apiFetch("/api/reports/shots", {
       method: "POST",
       body: JSON.stringify({
@@ -350,6 +352,7 @@ async function generateReport() {
       show_invoiced: showInvoiced,
       show_prod: showProd,
       report_title: filterUninvoiced ? "SHOTS TO BE INVOICED" : null,
+      filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
     // Step 3: request PDF from server
@@ -370,8 +373,6 @@ async function generateReport() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-    var reportType = filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status");
     a.download = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
     a.click();
     URL.revokeObjectURL(url);
