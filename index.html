@@ -83,6 +83,14 @@
   </div>
 </div>
 
+<!-- Filters -->
+<div class="card">
+  <div class="card-title">Filters</div>
+  <div class="check-group">
+    <label><input type="checkbox" id="filterUninvoiced"> To Be Invoiced</label>
+  </div>
+</div>
+
 <!-- Optional Columns -->
 <div class="card">
   <div class="card-title">Include Columns</div>
@@ -308,12 +316,14 @@ async function generateReport() {
   try {
     // Step 1: fetch shot data — pass shot_episodes so thumbnails only download for those
     btn.innerHTML = '<span class="spinner"></span>Querying ShotGrid...';
+    var filterUninvoiced = document.getElementById("filterUninvoiced").checked;
     var data = await apiFetch("/api/reports/shots", {
       method: "POST",
       body: JSON.stringify({
         project_id: projectId,
         episodes: ["all"],
-        thumb_episodes: shotEpisodes
+        thumb_episodes: shotEpisodes,
+        filter_uninvoiced: filterUninvoiced
       }),
     });
 
@@ -336,6 +346,7 @@ async function generateReport() {
       show_exr: showExr,
       show_present_next: showPresentNext,
       show_prod: showProd,
+      report_title: filterUninvoiced ? "SHOTS TO BE INVOICED" : null,
     };
 
     // Step 3: request PDF from server
