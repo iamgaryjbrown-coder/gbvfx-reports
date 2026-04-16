@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GBVFX Contacts</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0e17; color: #c8d6e5; font-family: 'SF Pro Display', -apple-system, sans-serif; padding: 30px 20px 60px; }
+  .header { text-align: center; margin-bottom: 30px; }
+  .header img { height: 36px; margin-bottom: 10px; opacity: 0.9; }
+  .header h1 { font-size: 22px; font-weight: 300; color: #fff; }
+  .header .sub { font-size: 12px; color: #7a8a99; margin-top: 4px; }
+
+  .projects { max-width: 800px; margin: 0 auto; }
+
+  .project { margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+  .project-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; background: rgba(255,255,255,0.03); }
+  .project-header:hover { background: rgba(255,255,255,0.05); }
+  .project-header .arrow { font-size: 10px; color: #7a8a99; transition: transform 0.2s; }
+  .project-header .arrow.open { transform: rotate(90deg); }
+  .project-header .show-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .project-header .show-code { font-size: 11px; color: #f39c12; margin-left: auto; font-family: 'SF Mono', monospace; }
+
+  .project-body { display: none; padding: 0 18px 18px; }
+  .project-body.open { display: block; }
+
+  /* Column headers */
+  .col-headers { display: grid; grid-template-columns: 160px 1fr 1fr 140px; gap: 8px; padding: 10px 0 6px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; }
+  .col-headers span { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #7a8a99; }
+
+  /* Contact row */
+  .contact-row { display: grid; grid-template-columns: 160px 1fr 1fr 140px; gap: 8px; align-items: center; padding: 4px 0; }
+  .contact-row .role { font-size: 11px; color: #7a8a99; padding-right: 8px; }
+  .contact-row input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #fff; font-family: inherit; outline: none; transition: border-color 0.2s; }
+  .contact-row input:focus { border-color: #f39c12; background: rgba(255,255,255,0.06); }
+  .contact-row input::placeholder { color: #3a4556; }
+
+  /* Post house section */
+  .section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f39c12; padding: 12px 0 6px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 8px; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .col-headers { grid-template-columns: 100px 1fr 1fr; }
+    .col-headers span:last-child { display: none; }
+    .contact-row { grid-template-columns: 100px 1fr 1fr; }
+    .contact-row input:last-of-type { display: none; }
+    .contact-row .role { font-size: 10px; }
+  }
+
+  .save-bar { max-width: 800px; margin: 30px auto 0; text-align: center; }
+  .save-btn { background: linear-gradient(135deg, #f39c12, #e67e22); border: none; color: #fff; padding: 12px 40px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: 0.5px; }
+  .save-btn:hover { opacity: 0.9; }
+  .save-status { font-size: 12px; color: #2ecc71; margin-top: 10px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="gbvfx_logo.png" alt="GBVFX">
+  <h1>Production Contacts</h1>
+  <div class="sub">Edit and save &mdash; synced to server</div>
+</div>
+
+<div class="projects" id="projects"></div>
+
+<div class="save-bar">
+  <button class="save-btn" onclick="saveAll()">Save All</button>
+  <div class="save-status" id="save-status">Saved</div>
+</div>
+
+<script>
+const SHOWS = [
+  {
+    code: 'BLM', name: 'Bloomers', sgId: 386,
+    production_company: 'Sister',
+    contacts: [
+      { role: 'Producer', name: 'Claire Jones', email: 'clairejones.bloomers@sister.net', phone: '' },
+      { role: 'PPS', name: 'Emma', email: 'emmalouise772@gmail.com', phone: '' },
+      { role: 'Post Prod Coordinator', name: 'Ewa', email: 'ewastryczek@hotmail.co.uk', phone: '' },
+      { role: '1st Assist Editor', name: 'Pilar Gomez Igbo', email: 'pilargomezigbo@gmail.com', phone: '' },
+      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
+    ],
+    post_house: 'Harbor',
+    post_contacts: [
+      { role: 'Post Producer', name: 'Paul McCullough', email: 'paul.mccullough@harborpicturecompany.com', phone: '' },
+      { role: 'Post Contact', name: 'Ciaran Ahern', email: 'ciaran.ahern@harborpicturecompany.com', phone: '' },
+      { role: 'Post Contact', name: 'Rebecca Budds', email: 'rebecca.budds@harborpicturecompany.com', phone: '' },
+      { role: 'Post Contact', name: 'Sophie McGuigan', email: 'sophie.mcguigan@harborpicturecompany.com', phone: '' }
+    ]
+  },
+  {
+    code: 'TOM', name: 'Tommy & Tuppence', sgId: 321,
+    production_company: 'Lookout Point',
+    contacts: [
+      { role: 'Producer', name: 'Stella Merz', email: 'stellamerz.tt@lookoutpoint.tv', phone: '' },
+      { role: 'PPS', name: 'Kiri Degon', email: 'kiri.degon@gmail.com', phone: '' },
+      { role: 'Post Prod Coordinator', name: 'May', email: 'maypostprod@gmail.com', phone: '' },
+      { role: '1st Assist Editor', name: '', email: '', phone: '' },
+      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
+    ],
+    post_house: 'Company 3 / CO3',
+    post_contacts: [
+      { role: 'Post Producer', name: 'Joanna Burt', email: 'joanna.burt@company3.com', phone: '' },
+      { role: 'Post Contact', name: '', email: '', phone: '' }
+    ]
+  },
+  {
+    code: 'TTM', name: 'TTM', sgId: 287,
+    production_company: '',
+    contacts: [
+      { role: 'Producer', name: '', email: '', phone: '' },
+      { role: 'PPS', name: 'Emma', email: 'emmalouise772@gmail.com', phone: '' },
+      { role: 'Post Prod Coordinator', name: 'Isabel', email: 'isabeljgaytan@gmail.com', phone: '' },
+      { role: '1st Assist Editor', name: '', email: '', phone: '' },
+      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
+    ],
+    post_house: 'Goldcrest',
+    post_contacts: [
+      { role: 'Post Producer', name: 'B. Ahern', email: 'bahern@goldcrestfilms.com', phone: '' },
+      { role: 'Post Contact', name: '', email: '', phone: '' }
+    ]
+  },
+  {
+    code: 'TREA', name: 'Treasure Island', sgId: 420,
+    production_company: 'Playground Entertainment',
+    contacts: [
+      { role: 'Producer', name: '', email: 'mhproducer.trea@playgroundentertainment.com', phone: '' },
+      { role: 'PPS', name: '', email: 'Post.trea@playgroundentertainment.com', phone: '' },
+      { role: 'Post Prod Coordinator', name: '', email: '', phone: '' },
+      { role: '1st Assist Editor', name: 'Hugo Cantrell', email: '', phone: '' },
+      { role: '2nd Assist Editor', name: 'Holly Burn', email: '', phone: '' }
+    ],
+    post_house: 'Residence Pictures',
+    post_contacts: [
+      { role: 'Post Producer', name: '', email: '', phone: '' },
+      { role: 'Post Contact', name: '', email: '', phone: '' }
+    ]
+  }
+];
+
+// Load saved data — server is source of truth, localStorage is fallback cache
+const API_TOKEN = localStorage.getItem('gbvfx_report_token') || '8fc2bc9fd62210a2c727f10952535db3ef4309119ed1ba6850bd99e719739938';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) {}
+
+// Fetch from server on load
+fetch('https://deliver.gbvfx.com/api/reports/contacts', {
+  headers: { 'Authorization': 'Bearer ' + API_TOKEN }
+}).then(r => r.json()).then(data => {
+  if (data && Object.keys(data).length > 0) {
+    saved = data;
+    localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
+    render();
+  }
+}).catch(() => {});
+
+function render() {
+  const container = document.getElementById('projects');
+  container.innerHTML = '';
+
+  SHOWS.forEach((show, i) => {
+    const data = saved[show.code] || show;
+    const isFirst = i === 0;
+
+    let html = '';
+
+    // Production company row
+    html += `<div class="contact-row" style="padding-bottom:8px;">
+      <div class="role" style="color:#f39c12;">Production Co.</div>
+      <input type="text" data-code="${show.code}" data-path="production_company" value="${data.production_company || ''}" placeholder="Company name" style="grid-column: 2 / -1;">
+    </div>`;
+
+    // Column headers
+    html += `<div class="col-headers">
+      <span>Role</span><span>Name</span><span>Email</span><span>Phone</span>
+    </div>`;
+
+    // Production contacts
+    const cList = data.contacts || show.contacts;
+    cList.forEach((c, ci) => {
+      html += contactRow(show.code, 'contacts', ci, c);
+      // Insert SG Forms dropdown after PPS row
+      if (c.role === 'PPS') {
+        const sgContact = data.sg_forms_contact || '';
+        const producerName = (cList.find(x => x.role === 'Producer') || {}).name || '';
+        const ppsName = (cList.find(x => x.role === 'PPS') || {}).name || '';
+        html += `<div class="contact-row" style="padding: 6px 0;">
+          <div class="role" style="color:#2ecc71; font-size:11px;">SG Forms Contact</div>
+          <select data-code="${show.code}" data-path="sg_forms_contact" style="grid-column: 2 / -1; background:rgba(46,204,113,0.08); border:1px solid rgba(46,204,113,0.25); border-radius:6px; padding:8px 10px; font-size:12px; color:#2ecc71; font-family:inherit; outline:none; cursor:pointer; appearance:auto;">
+            <option value="" ${!sgContact ? 'selected' : ''} style="background:#0a0e17; color:#7a8a99;">-- Select --</option>
+            <option value="producer" ${sgContact === 'producer' ? 'selected' : ''} style="background:#0a0e17; color:#fff;">Producer${producerName ? ' \u2014 ' + producerName : ''}</option>
+            <option value="pps" ${sgContact === 'pps' ? 'selected' : ''} style="background:#0a0e17; color:#fff;">PPS${ppsName ? ' \u2014 ' + ppsName : ''}</option>
+          </select>
+        </div>`;
+      }
+    });
+
+    // Post house section
+    html += `<div class="section-label">${data.post_house || show.post_house || 'Post / DI House'}</div>`;
+    html += `<div class="contact-row" style="padding-bottom:4px;">
+      <div class="role" style="color:#f39c12;">Post House</div>
+      <input type="text" data-code="${show.code}" data-path="post_house" value="${data.post_house || ''}" placeholder="Post house name" style="grid-column: 2 / -1;">
+    </div>`;
+
+    // Post contacts
+    (data.post_contacts || show.post_contacts).forEach((c, ci) => {
+      html += contactRow(show.code, 'post_contacts', ci, c);
+    });
+
+    // Add contact button
+    html += `<div style="padding-top:8px;">
+      <button onclick="addContact('${show.code}', 'contacts')" style="background:none; border:1px dashed rgba(255,255,255,0.15); color:#7a8a99; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; margin-right:8px;">+ Production</button>
+      <button onclick="addContact('${show.code}', 'post_contacts')" style="background:none; border:1px dashed rgba(255,255,255,0.15); color:#7a8a99; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer;">+ Post House</button>
+    </div>`;
+
+    container.innerHTML += `
+      <div class="project" data-show="${show.code}">
+        <div class="project-header" onclick="toggleProject(this)">
+          <span class="arrow ${isFirst ? 'open' : ''}">&#9654;</span>
+          <span class="show-name">${show.name}</span>
+          <span class="show-code">SG ${show.sgId} &bull; ${show.code}</span>
+        </div>
+        <div class="project-body ${isFirst ? 'open' : ''}">${html}</div>
+      </div>
+    `;
+  });
+}
+
+function contactRow(code, group, index, c) {
+  return `<div class="contact-row">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.role" value="${c.role || ''}" placeholder="Role" style="background:none; border:none; color:#7a8a99; padding:0; font-size:11px;">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.name" value="${c.name || ''}" placeholder="Name">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.email" value="${c.email || ''}" placeholder="email@...">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.phone" value="${c.phone || ''}" placeholder="Phone">
+  </div>`;
+}
+
+function toggleProject(header) {
+  header.querySelector('.arrow').classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+function addContact(code, group) {
+  if (!saved[code]) {
+    const show = SHOWS.find(s => s.code === code);
+    saved[code] = JSON.parse(JSON.stringify(show));
+  }
+  saved[code][group].push({ role: '', name: '', email: '', phone: '' });
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  render();
+  // Re-open the project
+  const proj = document.querySelector(`[data-show="${code}"]`);
+  proj.querySelector('.arrow').classList.add('open');
+  proj.querySelector('.project-body').classList.add('open');
+}
+
+function saveAll() {
+  const data = {};
+  SHOWS.forEach(show => {
+    data[show.code] = {
+      code: show.code,
+      name: show.name,
+      sgId: show.sgId,
+      production_company: '',
+      post_house: '',
+      contacts: [],
+      post_contacts: []
+    };
+  });
+
+  // Capture dropdowns (selects)
+  document.querySelectorAll('select[data-code]').forEach(sel => {
+    const code = sel.dataset.code;
+    const path = sel.dataset.path;
+    if (path && data[code]) data[code][path] = sel.value;
+  });
+
+  const inputs = document.querySelectorAll('input[data-code]');
+  inputs.forEach(inp => {
+    const code = inp.dataset.code;
+    const path = inp.dataset.path;
+    if (!path) return;
+
+    const parts = path.split('.');
+    if (parts.length === 1) {
+      data[code][parts[0]] = inp.value;
+    } else if (parts.length === 3) {
+      const group = parts[0];
+      const idx = parseInt(parts[1]);
+      const field = parts[2];
+      while (data[code][group].length <= idx) {
+        data[code][group].push({ role: '', name: '', email: '', phone: '' });
+      }
+      data[code][group][idx][field] = inp.value;
+    }
+  });
+
+  saved = data;
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
+
+  // Save to server (source of truth) + localStorage (cache)
+  fetch('https://deliver.gbvfx.com/api/reports/contacts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_TOKEN },
+    body: JSON.stringify(data)
+  }).then(r => {
+    const status = document.getElementById('save-status');
+    status.textContent = r.ok ? 'Saved to server + local' : 'Saved locally (server failed)';
+    status.style.color = r.ok ? '#2ecc71' : '#f39c12';
+    status.style.display = 'block';
+    setTimeout(() => status.style.display = 'none', 3000);
+  }).catch(() => {
+    const status = document.getElementById('save-status');
+    status.textContent = 'Saved locally (server unreachable)';
+    status.style.color = '#f39c12';
+    status.style.display = 'block';
+    setTimeout(() => status.style.display = 'none', 3000);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
