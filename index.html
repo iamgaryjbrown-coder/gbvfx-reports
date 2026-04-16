@@ -355,14 +355,29 @@ async function generateReport() {
       filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
-    // Step 3: generate PDF (saved to Dropbox, Finder opens automatically)
+    // Step 3: generate PDF
     btn.innerHTML = '<span class="spinner"></span>Generating PDF...';
-    var result = await apiFetch("/api/reports/pdf", {
+    var res = await fetch(API_BASE + "/api/reports/pdf", {
       method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
       body: JSON.stringify(payload),
     });
 
-    setStatus("Saved: " + result.filename, "success");
+    if (!res.ok) {
+      var errText = await res.text();
+      throw new Error("PDF generation failed: " + errText);
+    }
+
+    // Download PDF
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setStatus("PDF downloaded!", "success");
   } catch (e) {
     setStatus(e.message, "error");
   }
