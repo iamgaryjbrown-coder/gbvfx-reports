@@ -355,29 +355,14 @@ async function generateReport() {
       filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
-    // Step 3: request PDF from server
+    // Step 3: generate PDF (saved to Dropbox, Finder opens automatically)
     btn.innerHTML = '<span class="spinner"></span>Generating PDF...';
-    var res = await fetch(API_BASE + "/api/reports/pdf", {
+    var result = await apiFetch("/api/reports/pdf", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) {
-      var errText = await res.text();
-      throw new Error("PDF generation failed: " + errText);
-    }
-
-    // Step 4: download
-    var blob = await res.blob();
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
-    a.click();
-    URL.revokeObjectURL(url);
-
-    setStatus("PDF downloaded!", "success");
+    setStatus("Saved: " + result.filename, "success");
   } catch (e) {
     setStatus(e.message, "error");
   }
