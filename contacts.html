@@ -3,41 +3,121 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GBVFX Contacts</title>
+<title>GBVFX Project Brain</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0e17; color: #c8d6e5; font-family: 'SF Pro Display', -apple-system, sans-serif; padding: 30px 20px 60px; }
-  .header { text-align: center; margin-bottom: 30px; }
+  .header { text-align: center; margin-bottom: 20px; }
   .header img { height: 36px; margin-bottom: 10px; opacity: 0.9; }
   .header h1 { font-size: 22px; font-weight: 300; color: #fff; }
   .header .sub { font-size: 12px; color: #7a8a99; margin-top: 4px; }
 
+  /* Tabs */
+  .tabs { max-width: 800px; margin: 0 auto 20px; display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0; }
+  .tab { padding: 10px 20px; background: none; border: none; color: #7a8a99; font-size: 13px; font-family: inherit; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; letter-spacing: 0.5px; }
+  .tab.active { color: #fff; border-bottom-color: #f39c12; }
+  .tab .count { color: #f39c12; font-size: 11px; margin-left: 6px; }
+
   .projects { max-width: 800px; margin: 0 auto; }
 
   .project { margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+  .project.hidden { display: none; }
   .project-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; background: rgba(255,255,255,0.03); }
   .project-header:hover { background: rgba(255,255,255,0.05); }
   .project-header .arrow { font-size: 10px; color: #7a8a99; transition: transform 0.2s; }
   .project-header .arrow.open { transform: rotate(90deg); }
   .project-header .show-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .project-header .status-pill { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; padding: 3px 8px; border-radius: 10px; }
+  .project-header .status-pill.live { background: rgba(46,204,113,0.12); color: #2ecc71; }
+  .project-header .status-pill.archived { background: rgba(149,165,166,0.15); color: #95a5a6; }
   .project-header .show-code { font-size: 11px; color: #f39c12; margin-left: auto; font-family: 'SF Mono', monospace; }
 
   .project-body { display: none; padding: 0 18px 18px; }
   .project-body.open { display: block; }
 
+  /* Section headers */
+  .section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f39c12; padding: 14px 0 8px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 8px; }
+  .section-label:first-child { border-top: none; margin-top: 0; }
+
   /* Column headers */
-  .col-headers { display: grid; grid-template-columns: 160px 1fr 1fr 140px; gap: 8px; padding: 10px 0 6px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; }
+  .col-headers { display: grid; grid-template-columns: 160px 1fr 1fr 140px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; }
   .col-headers span { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #7a8a99; }
 
   /* Contact row */
   .contact-row { display: grid; grid-template-columns: 160px 1fr 1fr 140px; gap: 8px; align-items: center; padding: 4px 0; }
   .contact-row .role { font-size: 11px; color: #7a8a99; padding-right: 8px; }
-  .contact-row input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #fff; font-family: inherit; outline: none; transition: border-color 0.2s; }
-  .contact-row input:focus { border-color: #f39c12; background: rgba(255,255,255,0.06); }
+  .contact-row input, .contact-row select { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #fff; font-family: inherit; outline: none; transition: border-color 0.2s; }
+  .contact-row input:focus, .contact-row select:focus { border-color: #f39c12; background: rgba(255,255,255,0.06); }
   .contact-row input::placeholder { color: #3a4556; }
 
-  /* Post house section */
-  .section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f39c12; padding: 12px 0 6px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 8px; }
+  /* Inline unresolved conflicts panel — persists until resolved */
+  .unresolved-panel { background: rgba(231,76,60,0.06); border: 1px solid rgba(231,76,60,0.3); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .unresolved-panel h4 { font-size: 11px; color: #e74c3c; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 600; }
+  .unresolved-card { background: rgba(0,0,0,0.3); border-left: 3px solid #e74c3c; border-radius: 4px; padding: 10px 12px; margin-bottom: 10px; }
+  .unresolved-card.updated { border-left-color: #f39c12; }
+  .unresolved-card .uc-topic { font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .unresolved-card .uc-pill { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; padding: 2px 7px; border-radius: 9px; background: rgba(231,76,60,0.2); color: #e74c3c; }
+  .unresolved-card.updated .uc-pill { background: rgba(243,156,18,0.2); color: #f39c12; }
+  .unresolved-card .uc-ev { display: grid; grid-template-columns: 60px 1fr; gap: 6px; font-size: 11px; margin: 3px 0; }
+  .unresolved-card .uc-ev-label { color: #7a8a99; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9px; padding-top: 2px; }
+  .unresolved-card .uc-ev-val { color: #c8d6e5; }
+  .unresolved-card .uc-ev-val.new { color: #2ecc71; }
+  .unresolved-card .uc-rec { font-size: 11px; color: #7a8a99; font-style: italic; margin: 6px 0 8px; padding: 4px 0 0; border-top: 1px dashed rgba(255,255,255,0.06); }
+
+  /* Spud chat */
+  .uc-chat { background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px; margin: 8px 0; max-height: 240px; overflow-y: auto; }
+  .uc-msg { font-size: 12px; line-height: 1.5; margin: 4px 0; padding: 6px 10px; border-radius: 6px; }
+  .uc-msg.user { background: rgba(243,156,18,0.1); color: #fff; margin-left: 40px; }
+  .uc-msg.spud { background: rgba(46,204,113,0.1); color: #c8d6e5; margin-right: 40px; }
+  .uc-msg .role { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #7a8a99; margin-bottom: 2px; display: block; }
+  .uc-msg.user .role { color: #f39c12; }
+  .uc-msg.spud .role { color: #2ecc71; }
+  .uc-input-row { display: flex; gap: 6px; align-items: stretch; }
+  .uc-input-row input { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 10px; color: #fff; font-family: inherit; font-size: 12px; outline: none; }
+  .uc-input-row input:focus { border-color: #f39c12; }
+  .uc-btn { background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3); color: #2ecc71; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .uc-btn:hover { background: rgba(46,204,113,0.25); }
+  .uc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .uc-resolve-row { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; gap: 6px; align-items: stretch; }
+  .uc-resolve-row input { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(243,156,18,0.25); border-radius: 4px; padding: 6px 10px; color: #fff; font-family: inherit; font-size: 12px; outline: none; }
+  .uc-resolve-row input:focus { border-color: #f39c12; }
+  .uc-resolve-btn { background: linear-gradient(135deg, #f39c12, #e67e22); color: #fff; border: none; padding: 6px 14px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+  /* Workflow docs section */
+  .workflow-section-header { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 14px 0 8px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 8px; }
+  .workflow-section-header:first-child { border-top: none; margin-top: 0; }
+  .workflow-section-header .wf-arrow { font-size: 9px; color: #7a8a99; transition: transform 0.15s; }
+  .workflow-section-header .wf-arrow.open { transform: rotate(90deg); }
+  .workflow-section-header .wf-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f39c12; }
+  .workflow-section-header .wf-badge { font-size: 10px; color: #2ecc71; margin-left: auto; }
+  .workflow-section-body { display: none; }
+  .workflow-section-body.open { display: block; }
+  .workflow-box { background: rgba(243,156,18,0.04); border: 1px solid rgba(243,156,18,0.15); border-radius: 8px; padding: 14px; margin-top: 8px; }
+  .workflow-row { display: flex; gap: 8px; align-items: stretch; }
+  .file-picker { flex: 1; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.18); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #7a8a99; cursor: pointer; transition: all 0.15s; min-height: 38px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .file-picker:hover { border-color: #f39c12; color: #fff; background: rgba(243,156,18,0.06); }
+  .file-picker.has-files { border-style: solid; border-color: rgba(243,156,18,0.3); color: #c8d6e5; }
+  .file-picker.dragging { border-style: solid; border-color: #2ecc71; background: rgba(46,204,113,0.08); color: #2ecc71; }
+  .file-picker input[type=file] { display: none; }
+  .file-chip { background: rgba(243,156,18,0.15); border: 1px solid rgba(243,156,18,0.3); padding: 3px 8px; border-radius: 4px; font-size: 11px; color: #fff; display: inline-flex; align-items: center; gap: 6px; }
+  .file-chip .x { color: #e74c3c; cursor: pointer; font-weight: bold; opacity: 0.7; }
+  .file-chip .x:hover { opacity: 1; }
+  .workflow-btn { background: linear-gradient(135deg, #f39c12, #e67e22); border: none; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .workflow-btn:hover { opacity: 0.9; }
+  .workflow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .workflow-meta { font-size: 10px; color: #7a8a99; margin-top: 8px; }
+  .workflow-meta .ok { color: #2ecc71; }
+  .workflow-summary { margin-top: 10px; padding: 10px 12px; background: rgba(0,0,0,0.25); border-radius: 6px; font-family: 'SF Mono', monospace; font-size: 11px; color: #c8d6e5; white-space: pre-wrap; max-height: 300px; overflow-y: auto; line-height: 1.5; }
+
+  /* Role input — make clearly editable */
+  .contact-row input.role-input { background: none; border: none; border-bottom: 1px dashed rgba(255,255,255,0.1); color: #c8d6e5; padding: 6px 0; font-size: 11px; border-radius: 0; }
+  .contact-row input.role-input:focus { border-bottom-color: #f39c12; background: rgba(243,156,18,0.03); }
+  .contact-row input.role-input::placeholder { color: #3a4556; font-style: italic; }
+
+  /* Add contact inline button */
+  .add-row { display: flex; gap: 8px; padding: 8px 0 4px; }
+  .add-row button { background: rgba(46,204,113,0.08); border: 1px dashed rgba(46,204,113,0.25); color: #2ecc71; padding: 6px 14px; border-radius: 6px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  .add-row button:hover { background: rgba(46,204,113,0.15); border-style: solid; }
 
   /* Responsive */
   @media (max-width: 700px) {
@@ -52,272 +132,856 @@
   .save-btn { background: linear-gradient(135deg, #f39c12, #e67e22); border: none; color: #fff; padding: 12px 40px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: 0.5px; }
   .save-btn:hover { opacity: 0.9; }
   .save-status { font-size: 12px; color: #2ecc71; margin-top: 10px; display: none; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #0a0e17; border: 1px solid rgba(243,156,18,0.3); border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 88vh; display: flex; flex-direction: column; }
+  .modal h2 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .modal .modal-sub { font-size: 11px; color: #7a8a99; margin-bottom: 16px; }
+  .modal-scroll { flex: 1 1 auto; overflow-y: auto; padding-right: 6px; min-height: 0; }
+  .modal textarea { width: 100%; height: 260px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; color: #c8d6e5; font-family: 'SF Mono', monospace; font-size: 12px; line-height: 1.5; outline: none; resize: vertical; }
+  .modal textarea:focus { border-color: #f39c12; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+  .modal-btn { padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+  .modal-btn.cancel { background: rgba(255,255,255,0.06); color: #c8d6e5; border: 1px solid rgba(255,255,255,0.1); }
+  .modal-btn.approve { background: linear-gradient(135deg, #2ecc71, #27ae60); color: #fff; }
+  .modal-btn:hover { opacity: 0.9; }
+  .modal-manifest { margin-top: 12px; font-size: 10px; color: #7a8a99; max-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 4px; }
+  .modal-manifest li { list-style: none; margin: 2px 0; }
+  .modal-conflicts { margin-top: 12px; padding: 10px 12px; background: rgba(231,76,60,0.05); border: 1px solid rgba(231,76,60,0.2); border-radius: 6px; }
+  .modal-conflicts h3 { font-size: 11px; color: #e74c3c; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 600; }
+  .conflict-card { background: rgba(0,0,0,0.25); border-left: 3px solid #e74c3c; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+  .conflict-card.updated { border-left-color: #f39c12; }
+  .conflict-card .kind-topic { font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .conflict-card .kind-pill { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; padding: 2px 7px; border-radius: 9px; background: rgba(231,76,60,0.2); color: #e74c3c; }
+  .conflict-card.updated .kind-pill { background: rgba(243,156,18,0.2); color: #f39c12; }
+  .conflict-card .ev { display: grid; grid-template-columns: 60px 1fr; gap: 6px; font-size: 11px; margin: 4px 0; }
+  .conflict-card .ev-label { color: #7a8a99; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9px; padding-top: 2px; }
+  .conflict-card .ev-value { color: #c8d6e5; }
+  .conflict-card .ev-value.new { color: #2ecc71; }
+  .conflict-card .rec { font-size: 11px; color: #7a8a99; font-style: italic; margin: 6px 0 8px; padding: 4px 0 0; border-top: 1px dashed rgba(255,255,255,0.06); }
+  .conflict-card textarea { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 8px; color: #fff; font-family: inherit; font-size: 12px; resize: vertical; min-height: 44px; outline: none; }
+  .conflict-card textarea:focus { border-color: #f39c12; }
+  .conflict-card .decision-label { font-size: 10px; color: #f39c12; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; display: block; }
+
+  .modal-contacts { margin-top: 12px; padding: 10px 12px; background: rgba(46,204,113,0.06); border: 1px solid rgba(46,204,113,0.2); border-radius: 6px; }
+  .modal-contacts h3 { font-size: 11px; color: #2ecc71; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600; }
+  .modal-contact-row { display: flex; gap: 8px; align-items: center; padding: 4px 0; font-size: 12px; }
+  .modal-contact-row input[type=checkbox] { width: 16px; height: 16px; accent-color: #2ecc71; cursor: pointer; }
+  .modal-contact-row .role { color: #7a8a99; min-width: 110px; font-size: 11px; }
+  .modal-contact-row .name { color: #fff; min-width: 130px; }
+  .modal-contact-row .email { color: #c8d6e5; flex: 1; font-family: 'SF Mono', monospace; font-size: 11px; }
+  .modal-contact-row .dupe { font-size: 10px; color: #f39c12; font-style: italic; }
+
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Add project inline */
+  .add-project { max-width: 800px; margin: 20px auto 0; text-align: center; }
+  .add-project button { background: none; border: 1px dashed rgba(255,255,255,0.2); color: #7a8a99; padding: 10px 20px; border-radius: 8px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .add-project button:hover { color: #f39c12; border-color: #f39c12; }
 </style>
 </head>
 <body>
 
 <div class="header">
   <img src="gbvfx_logo.png" alt="GBVFX">
-  <h1>Production Contacts</h1>
-  <div class="sub">Edit and save &mdash; synced to server</div>
+  <h1>Project Brain</h1>
+  <div class="sub">Contacts &middot; Workflow docs &middot; Source of truth for Claude Code &amp; Spud</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-filter="live" onclick="switchTab('live')">Live <span class="count" id="count-live">0</span></button>
+  <button class="tab" data-filter="archived" onclick="switchTab('archived')">Archived <span class="count" id="count-archived">0</span></button>
 </div>
 
 <div class="projects" id="projects"></div>
+
+<div class="add-project">
+  <button onclick="addProject()">+ Add project</button>
+</div>
 
 <div class="save-bar">
   <button class="save-btn" onclick="saveAll()">Save All</button>
   <div class="save-status" id="save-status">Saved</div>
 </div>
 
+<!-- Summary preview modal -->
+<div class="modal-overlay" id="summary-modal">
+  <div class="modal">
+    <h2 id="modal-title">Workflow summary preview</h2>
+    <div class="modal-sub">Review, edit if needed, then Approve to propagate to Claude Code + Spud. Cancel to discard.</div>
+    <div class="modal-scroll">
+      <textarea id="modal-textarea" spellcheck="false"></textarea>
+      <div class="modal-conflicts" id="modal-conflicts" style="display:none;"></div>
+      <div class="modal-contacts" id="modal-contacts" style="display:none;"></div>
+      <div class="modal-manifest" id="modal-manifest"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn approve" onclick="approveModal()">Approve &amp; save</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const SHOWS = [
-  {
-    code: 'BLM', name: 'Bloomers', sgId: 386,
-    production_company: 'Sister',
-    contacts: [
-      { role: 'Producer', name: 'Claire Jones', email: 'clairejones.bloomers@sister.net', phone: '' },
-      { role: 'PPS', name: 'Emma', email: 'emmalouise772@gmail.com', phone: '' },
-      { role: 'Post Prod Coordinator', name: 'Ewa', email: 'ewastryczek@hotmail.co.uk', phone: '' },
-      { role: '1st Assist Editor', name: 'Pilar Gomez Igbo', email: 'pilargomezigbo@gmail.com', phone: '' },
-      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
-    ],
-    post_house: 'Harbor',
-    post_contacts: [
-      { role: 'Post Producer', name: 'Paul McCullough', email: 'paul.mccullough@harborpicturecompany.com', phone: '' },
-      { role: 'Post Contact', name: 'Ciaran Ahern', email: 'ciaran.ahern@harborpicturecompany.com', phone: '' },
-      { role: 'Post Contact', name: 'Rebecca Budds', email: 'rebecca.budds@harborpicturecompany.com', phone: '' },
-      { role: 'Post Contact', name: 'Sophie McGuigan', email: 'sophie.mcguigan@harborpicturecompany.com', phone: '' }
-    ]
-  },
-  {
-    code: 'TOM', name: 'Tommy & Tuppence', sgId: 321,
-    production_company: 'Lookout Point',
-    contacts: [
-      { role: 'Producer', name: 'Stella Merz', email: 'stellamerz.tt@lookoutpoint.tv', phone: '' },
-      { role: 'PPS', name: 'Kiri Degon', email: 'kiri.degon@gmail.com', phone: '' },
-      { role: 'Post Prod Coordinator', name: 'May', email: 'maypostprod@gmail.com', phone: '' },
-      { role: '1st Assist Editor', name: '', email: '', phone: '' },
-      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
-    ],
-    post_house: 'Company 3 / CO3',
-    post_contacts: [
-      { role: 'Post Producer', name: 'Joanna Burt', email: 'joanna.burt@company3.com', phone: '' },
-      { role: 'Post Contact', name: '', email: '', phone: '' }
-    ]
-  },
-  {
-    code: 'TTM', name: 'TTM', sgId: 287,
-    production_company: '',
-    contacts: [
-      { role: 'Producer', name: '', email: '', phone: '' },
-      { role: 'PPS', name: 'Emma', email: 'emmalouise772@gmail.com', phone: '' },
-      { role: 'Post Prod Coordinator', name: 'Isabel', email: 'isabeljgaytan@gmail.com', phone: '' },
-      { role: '1st Assist Editor', name: '', email: '', phone: '' },
-      { role: '2nd Assist Editor', name: '', email: '', phone: '' }
-    ],
-    post_house: 'Goldcrest',
-    post_contacts: [
-      { role: 'Post Producer', name: 'B. Ahern', email: 'bahern@goldcrestfilms.com', phone: '' },
-      { role: 'Post Contact', name: '', email: '', phone: '' }
-    ]
-  },
-  {
-    code: 'TREA', name: 'Treasure Island', sgId: 420,
-    production_company: 'Playground Entertainment',
-    contacts: [
-      { role: 'Producer', name: '', email: 'mhproducer.trea@playgroundentertainment.com', phone: '' },
-      { role: 'PPS', name: '', email: 'Post.trea@playgroundentertainment.com', phone: '' },
-      { role: 'Post Prod Coordinator', name: '', email: '', phone: '' },
-      { role: '1st Assist Editor', name: 'Hugo Cantrell', email: '', phone: '' },
-      { role: '2nd Assist Editor', name: 'Holly Burn', email: '', phone: '' }
-    ],
-    post_house: 'Residence Pictures',
-    post_contacts: [
-      { role: 'Post Producer', name: '', email: '', phone: '' },
-      { role: 'Post Contact', name: '', email: '', phone: '' }
-    ]
-  }
+const API_TOKEN = localStorage.getItem('gbvfx_report_token') || '8fc2bc9fd62210a2c727f10952535db3ef4309119ed1ba6850bd99e719739938';
+const API_BASE = 'https://deliver.gbvfx.com';
+
+// Default seed — used only if server returns empty
+const SEED = [
+  { code: 'BLM', name: 'Bloomers', sgId: 386, status: 'live' },
+  { code: 'TOM', name: 'Tommy & Tuppence', sgId: 321, status: 'live' },
+  { code: 'TTM', name: 'TTM', sgId: 287, status: 'live' },
+  { code: 'TREA', name: 'Treasure Island', sgId: 420, status: 'live' }
 ];
 
-// Load saved data — server is source of truth, localStorage is fallback cache
-const API_TOKEN = localStorage.getItem('gbvfx_report_token') || '8fc2bc9fd62210a2c727f10952535db3ef4309119ed1ba6850bd99e719739938';
 let saved = {};
-try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) {}
+let activeTab = 'live';
+let modalContext = null;  // { code, summary, manifest, file_count }
+// Picked File objects per project, keyed by code. Not persisted across reloads.
+const pickedFiles = {};
+// Which project cards are currently expanded. Set of project codes.
+const openProjects = new Set();
+let openProjectsInitialised = false;
+// Which project workflow-docs sections are expanded (per project code).
+const workflowOpen = new Set();
 
-// Fetch from server on load
-fetch('https://deliver.gbvfx.com/api/reports/contacts', {
-  headers: { 'Authorization': 'Bearer ' + API_TOKEN }
-}).then(r => r.json()).then(data => {
-  if (data && Object.keys(data).length > 0) {
-    saved = data;
-    localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
-    render();
+try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) { saved = {}; }
+
+// Fetch from server on load — server is source of truth
+fetch(API_BASE + '/api/reports/contacts', { headers: { 'Authorization': 'Bearer ' + API_TOKEN } })
+  .then(r => r.json())
+  .then(data => {
+    if (data && Object.keys(data).length > 0) {
+      saved = data;
+      localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
+      render();
+    }
+  }).catch(() => {});
+
+// Normalise a project so all expected fields exist
+function normalise(p) {
+  return {
+    code: p.code,
+    name: p.name || p.code,
+    sgId: p.sgId || p.shotgrid_project_id || null,
+    status: p.status || 'live',
+    production_company: p.production_company || '',
+    post_house: p.post_house || '',
+    sg_forms_contact: p.sg_forms_contact || '',
+    contacts: Array.isArray(p.contacts) ? p.contacts : [
+      { role: 'Producer', name: '', email: '', phone: '' },
+      { role: 'PPS', name: '', email: '', phone: '' },
+      { role: 'Post Prod Coordinator', name: '', email: '', phone: '' },
+      { role: '1st Assist Editor', name: '', email: '', phone: '' }
+    ],
+    post_contacts: Array.isArray(p.post_contacts) ? p.post_contacts : [
+      { role: 'Post Producer', name: '', email: '', phone: '' },
+      { role: 'Post Contact', name: '', email: '', phone: '' }
+    ],
+    workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {})
+  };
+}
+
+function ensureSeeded() {
+  if (Object.keys(saved).length === 0) {
+    SEED.forEach(s => { saved[s.code] = normalise(s); });
   }
-}).catch(() => {});
+  Object.keys(saved).forEach(code => { saved[code] = normalise(saved[code]); });
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.filter === tab));
+  document.querySelectorAll('.project').forEach(el => {
+    const s = el.dataset.status || 'live';
+    el.classList.toggle('hidden', s !== tab);
+  });
+}
+
+function updateTabCounts() {
+  let live = 0, archived = 0;
+  Object.values(saved).forEach(p => {
+    if ((p.status || 'live') === 'archived') archived++; else live++;
+  });
+  document.getElementById('count-live').textContent = live;
+  document.getElementById('count-archived').textContent = archived;
+}
 
 function render() {
+  ensureSeeded();
   const container = document.getElementById('projects');
   container.innerHTML = '';
 
-  SHOWS.forEach((show, i) => {
-    const data = saved[show.code] || show;
-    const isFirst = i === 0;
+  const codes = Object.keys(saved).sort();
+
+  codes.forEach((code, i) => {
+    const data = saved[code];
+    const status = data.status || 'live';
+    const isOpen = openProjects.has(code);
 
     let html = '';
 
-    // Production company row
-    html += `<div class="contact-row" style="padding-bottom:8px;">
-      <div class="role" style="color:#f39c12;">Production Co.</div>
-      <input type="text" data-code="${show.code}" data-path="production_company" value="${data.production_company || ''}" placeholder="Company name" style="grid-column: 2 / -1;">
+    // ── Status + Production Co ──
+    html += `<div class="section-label">Project</div>`;
+    html += `<div class="contact-row">
+      <div class="role">Status</div>
+      <select data-code="${code}" data-path="status" onchange="updateStatusPill('${code}', this.value)" style="grid-column: 2 / 3;">
+        <option value="live" ${status === 'live' ? 'selected' : ''}>Live</option>
+        <option value="archived" ${status === 'archived' ? 'selected' : ''}>Archived</option>
+      </select>
+      <input type="text" data-code="${code}" data-path="production_company" value="${esc(data.production_company)}" placeholder="Production company" style="grid-column: 3 / -1;">
     </div>`;
 
-    // Column headers
-    html += `<div class="col-headers">
-      <span>Role</span><span>Name</span><span>Email</span><span>Phone</span>
-    </div>`;
-
-    // Production contacts
-    const cList = data.contacts || show.contacts;
-    cList.forEach((c, ci) => {
-      html += contactRow(show.code, 'contacts', ci, c);
-      // Insert SG Forms dropdown after PPS row
+    // ── Contacts ──
+    html += `<div class="section-label">Production Contacts</div>`;
+    html += `<div class="col-headers"><span>Job Title</span><span>Name</span><span>Email</span><span>Phone</span></div>`;
+    data.contacts.forEach((c, ci) => {
+      html += contactRow(code, 'contacts', ci, c);
       if (c.role === 'PPS') {
         const sgContact = data.sg_forms_contact || '';
-        const producerName = (cList.find(x => x.role === 'Producer') || {}).name || '';
-        const ppsName = (cList.find(x => x.role === 'PPS') || {}).name || '';
-        html += `<div class="contact-row" style="padding: 6px 0;">
-          <div class="role" style="color:#2ecc71; font-size:11px;">SG Forms Contact</div>
-          <select data-code="${show.code}" data-path="sg_forms_contact" style="grid-column: 2 / -1; background:rgba(46,204,113,0.08); border:1px solid rgba(46,204,113,0.25); border-radius:6px; padding:8px 10px; font-size:12px; color:#2ecc71; font-family:inherit; outline:none; cursor:pointer; appearance:auto;">
-            <option value="" ${!sgContact ? 'selected' : ''} style="background:#0a0e17; color:#7a8a99;">-- Select --</option>
-            <option value="producer" ${sgContact === 'producer' ? 'selected' : ''} style="background:#0a0e17; color:#fff;">Producer${producerName ? ' \u2014 ' + producerName : ''}</option>
-            <option value="pps" ${sgContact === 'pps' ? 'selected' : ''} style="background:#0a0e17; color:#fff;">PPS${ppsName ? ' \u2014 ' + ppsName : ''}</option>
+        const producerName = (data.contacts.find(x => x.role === 'Producer') || {}).name || '';
+        const ppsName = c.name || '';
+        html += `<div class="contact-row" style="padding: 4px 0;">
+          <div class="role" style="color:#2ecc71;">SG Forms Contact</div>
+          <select data-code="${code}" data-path="sg_forms_contact" style="grid-column: 2 / -1; background:rgba(46,204,113,0.08); border-color:rgba(46,204,113,0.25); color:#2ecc71;">
+            <option value="" ${!sgContact ? 'selected' : ''}>-- Select --</option>
+            <option value="producer" ${sgContact === 'producer' ? 'selected' : ''}>Producer${producerName ? ' — ' + esc(producerName) : ''}</option>
+            <option value="pps" ${sgContact === 'pps' ? 'selected' : ''}>PPS${ppsName ? ' — ' + esc(ppsName) : ''}</option>
           </select>
         </div>`;
       }
     });
 
-    // Post house section
-    html += `<div class="section-label">${data.post_house || show.post_house || 'Post / DI House'}</div>`;
+    // Add-contact button for production section
+    html += `<div class="add-row">
+      <button onclick="addContact('${code}', 'contacts')">+ Add production contact</button>
+    </div>`;
+
+    // ── Post house ──
+    html += `<div class="section-label">${esc(data.post_house || 'Post / DI House')}</div>`;
     html += `<div class="contact-row" style="padding-bottom:4px;">
       <div class="role" style="color:#f39c12;">Post House</div>
-      <input type="text" data-code="${show.code}" data-path="post_house" value="${data.post_house || ''}" placeholder="Post house name" style="grid-column: 2 / -1;">
+      <input type="text" data-code="${code}" data-path="post_house" value="${esc(data.post_house)}" placeholder="Post house name" style="grid-column: 2 / -1;">
     </div>`;
-
-    // Post contacts
-    (data.post_contacts || show.post_contacts).forEach((c, ci) => {
-      html += contactRow(show.code, 'post_contacts', ci, c);
+    html += `<div class="col-headers"><span>Job Title</span><span>Name</span><span>Email</span><span>Phone</span></div>`;
+    data.post_contacts.forEach((c, ci) => {
+      html += contactRow(code, 'post_contacts', ci, c);
     });
-
-    // Add contact button
-    html += `<div style="padding-top:8px;">
-      <button onclick="addContact('${show.code}', 'contacts')" style="background:none; border:1px dashed rgba(255,255,255,0.15); color:#7a8a99; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; margin-right:8px;">+ Production</button>
-      <button onclick="addContact('${show.code}', 'post_contacts')" style="background:none; border:1px dashed rgba(255,255,255,0.15); color:#7a8a99; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer;">+ Post House</button>
+    html += `<div class="add-row">
+      <button onclick="addContact('${code}', 'post_contacts')">+ Add post house contact</button>
     </div>`;
 
-    container.innerHTML += `
-      <div class="project" data-show="${show.code}">
-        <div class="project-header" onclick="toggleProject(this)">
-          <span class="arrow ${isFirst ? 'open' : ''}">&#9654;</span>
-          <span class="show-name">${show.name}</span>
-          <span class="show-code">SG ${show.sgId} &bull; ${show.code}</span>
-        </div>
-        <div class="project-body ${isFirst ? 'open' : ''}">${html}</div>
+    // ── Workflow docs ──
+    const pickedList = (pickedFiles[code] || []).map((f, idx) =>
+      `<span class="file-chip">${esc(f.name)} <span class="x" onclick="event.stopPropagation(); removePickedFile('${code}', ${idx})">&times;</span></span>`
+    ).join('');
+    const hasFiles = (pickedFiles[code] || []).length > 0;
+    const savedNames = (data.workflow_docs.file_names || []).join(', ');
+
+    const hasExistingSummary = !!(data.workflow_docs.summary && data.workflow_docs.summary.trim());
+    const genLabel = hasExistingSummary ? 'Update summary' : 'Generate summary';
+
+    const wfOpen = workflowOpen.has(code);
+    const unresolvedList = Array.isArray(data.workflow_docs.unresolved_conflicts) ? data.workflow_docs.unresolved_conflicts : [];
+    const unresolvedBadge = unresolvedList.length > 0
+      ? `<span class="wf-badge" style="color:#e74c3c;">&#9888; ${unresolvedList.length} unresolved</span>`
+      : (hasExistingSummary ? `<span class="wf-badge">&#9679; summary on file</span>` : '');
+
+    html += `<div class="workflow-section-header" onclick="toggleWorkflow('${code}')">
+      <span class="wf-arrow ${wfOpen ? 'open' : ''}">&#9654;</span>
+      <span class="wf-label">Workflow Docs &mdash; Project Brain</span>
+      ${unresolvedBadge}
+    </div>`;
+    html += `<div class="workflow-section-body ${wfOpen ? 'open' : ''}">`;
+
+    // ── Unresolved conflicts panel (inline, above the workflow-box) ──
+    if (unresolvedList.length > 0) {
+      const cards = unresolvedList.map((uc, ucIdx) => {
+        const kindClass = uc.kind === 'updated' ? 'updated' : '';
+        const kindLabel = uc.kind === 'updated' ? 'Updated' : 'Conflict';
+        const chatHtml = (uc.chat || []).map(m => {
+          const role = m.role === 'user' ? 'user' : 'spud';
+          const roleLabel = m.role === 'user' ? 'Gary' : 'Spud';
+          return `<div class="uc-msg ${role}"><span class="role">${roleLabel}</span>${esc(m.content || '')}</div>`;
+        }).join('');
+        return `<div class="unresolved-card ${kindClass}" id="uc-${uc.id}">
+          <div class="uc-topic"><span class="uc-pill">${kindLabel}</span>${esc(uc.topic || 'Untitled')}</div>
+          <div class="uc-ev"><span class="uc-ev-label">Existing</span><span class="uc-ev-val">${esc(uc.existing || '—')}</span></div>
+          <div class="uc-ev"><span class="uc-ev-label">New</span><span class="uc-ev-val new">${esc(uc.new || '—')}</span></div>
+          ${uc.recommendation ? `<div class="uc-rec">Recommendation: ${esc(uc.recommendation)}</div>` : ''}
+          <div class="uc-chat" id="chat-${uc.id}">${chatHtml || '<div style="font-size:10px; color:#5a6778; text-align:center; padding:6px;">Ask Spud for help below, or enter your decision directly.</div>'}</div>
+          <div class="uc-input-row">
+            <input type="text" id="chatinput-${uc.id}" placeholder="Ask Spud about this conflict\u2026" onkeydown="if(event.key==='Enter'){sendChat('${code}','${uc.id}')}">
+            <button class="uc-btn" id="chatbtn-${uc.id}" onclick="sendChat('${code}','${uc.id}')">Ask Spud</button>
+          </div>
+          <div class="uc-resolve-row">
+            <input type="text" id="resolve-${uc.id}" placeholder="Final decision (gets stamped into the summary)">
+            <button class="uc-resolve-btn" onclick="resolveConflict('${code}','${uc.id}')">Mark resolved</button>
+          </div>
+        </div>`;
+      }).join('');
+      html += `<div class="unresolved-panel">
+        <h4>&#9888; Unresolved conflicts (${unresolvedList.length}) &mdash; persist until you resolve them</h4>
+        ${cards}
+      </div>`;
+    }
+
+    html += `<div class="workflow-box">
+      <div class="workflow-row">
+        <label class="file-picker ${hasFiles ? 'has-files' : ''}" id="picker-${code}" for="files-${code}"
+               ondragover="onDragOver(event, '${code}')" ondragleave="onDragLeave(event, '${code}')" ondrop="onDrop(event, '${code}')">
+          ${hasFiles ? pickedList : (savedNames
+              ? '<span style="color:#7a8a99;">Previously fed: ' + esc(savedNames) + '. Click or drop new files to add.</span>'
+              : '<span>Click to pick or drop workflow docs here (pdf, docx, txt, md\u2026)</span>')}
+        </label>
+        <input type="file" id="files-${code}" multiple accept=".pdf,.docx,.doc,.txt,.md,.rtf,.csv,.html,.htm" style="position:absolute; left:-9999px;" onchange="onFilesPicked('${code}', this.files); this.value='';">
+        <button class="workflow-btn" id="gen-${code}" onclick="generateSummary('${code}')">${genLabel}</button>
       </div>
+      <div class="workflow-meta" id="meta-${code}">${
+        data.workflow_docs.summary_generated_at
+          ? '<span class="ok">&#9679;</span> Summary last generated ' + esc(data.workflow_docs.summary_generated_at) + (hasExistingSummary ? ' &mdash; adding new docs will merge into the existing summary.' : '')
+          : '<span>No summary yet &mdash; pick files and click Generate.</span>'
+      }</div>
+      ${data.workflow_docs.summary ? `<div class="workflow-summary" id="summary-${code}">${esc(data.workflow_docs.summary)}</div>
+      <div style="margin-top:10px; text-align:right;">
+        <button onclick="clearSummary('${code}')" style="background:rgba(231,76,60,0.08); border:1px solid rgba(231,76,60,0.25); color:#e74c3c; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; font-family:inherit;">Clear summary</button>
+      </div>` : ''}
+    </div>
+    </div>`;
+
+    const hidden = status !== activeTab ? 'hidden' : '';
+    const pillClass = status === 'archived' ? 'archived' : 'live';
+
+    const projectEl = document.createElement('div');
+    projectEl.className = 'project ' + hidden;
+    projectEl.dataset.show = code;
+    projectEl.dataset.status = status;
+    projectEl.innerHTML = `
+      <div class="project-header" onclick="toggleProject(this)">
+        <span class="arrow ${isOpen ? 'open' : ''}">&#9654;</span>
+        <span class="show-name">${esc(data.name)}</span>
+        <span class="status-pill ${pillClass}" id="pill-${code}">${status}</span>
+        <span class="show-code">${data.sgId ? 'SG ' + data.sgId + ' • ' : ''}${code}</span>
+      </div>
+      <div class="project-body ${isOpen ? 'open' : ''}">${html}</div>
     `;
+    container.appendChild(projectEl);
   });
+
+  updateTabCounts();
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function contactRow(code, group, index, c) {
   return `<div class="contact-row">
-    <input type="text" data-code="${code}" data-path="${group}.${index}.role" value="${c.role || ''}" placeholder="Role" style="background:none; border:none; color:#7a8a99; padding:0; font-size:11px;">
-    <input type="text" data-code="${code}" data-path="${group}.${index}.name" value="${c.name || ''}" placeholder="Name">
-    <input type="text" data-code="${code}" data-path="${group}.${index}.email" value="${c.email || ''}" placeholder="email@...">
-    <input type="text" data-code="${code}" data-path="${group}.${index}.phone" value="${c.phone || ''}" placeholder="Phone">
+    <input class="role-input" type="text" data-code="${code}" data-path="${group}.${index}.role" value="${esc(c.role)}" placeholder="Job title">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.name" value="${esc(c.name)}" placeholder="Name">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.email" value="${esc(c.email)}" placeholder="email@...">
+    <input type="text" data-code="${code}" data-path="${group}.${index}.phone" value="${esc(c.phone)}" placeholder="Phone">
   </div>`;
 }
 
+function _findUnresolved(code, id) {
+  const list = saved[code] && saved[code].workflow_docs && saved[code].workflow_docs.unresolved_conflicts;
+  if (!Array.isArray(list)) return null;
+  return list.find(u => u.id === id) || null;
+}
+
+async function sendChat(code, id) {
+  const uc = _findUnresolved(code, id);
+  if (!uc) return;
+  const input = document.getElementById('chatinput-' + id);
+  const btn = document.getElementById('chatbtn-' + id);
+  const chatBox = document.getElementById('chat-' + id);
+  const msg = (input.value || '').trim();
+  if (!msg) return;
+  input.value = '';
+  btn.disabled = true;
+  btn.textContent = 'Asking\u2026';
+
+  // Append user message locally so Gary sees it instantly
+  if (!Array.isArray(uc.chat)) uc.chat = [];
+  uc.chat.push({ role: 'user', content: msg, ts: new Date().toISOString() });
+  render();
+  const box = document.getElementById('chat-' + id);
+  if (box) box.scrollTop = box.scrollHeight;
+
+  // Build the Anthropic messages array from chat history
+  const messages = uc.chat.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+
+  try {
+    const r = await fetch(API_BASE + '/api/reports/projects/conflict-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_TOKEN },
+      body: JSON.stringify({
+        code,
+        name: saved[code].name,
+        conflict: { kind: uc.kind, topic: uc.topic, existing: uc.existing, new: uc.new, recommendation: uc.recommendation },
+        messages,
+        project_brain: (saved[code].workflow_docs && saved[code].workflow_docs.summary) || ''
+      })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    uc.chat.push({ role: 'assistant', content: data.reply || '', ts: new Date().toISOString() });
+    localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+    // Persist to server so chat survives across devices/sessions
+    fetch(API_BASE + '/api/reports/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_TOKEN },
+      body: JSON.stringify(saved)
+    }).catch(() => {});
+    render();
+    const box2 = document.getElementById('chat-' + id);
+    if (box2) box2.scrollTop = box2.scrollHeight;
+  } catch (e) {
+    uc.chat.push({ role: 'assistant', content: '⚠ Chat failed: ' + e.message, ts: new Date().toISOString() });
+    render();
+  } finally {
+    const btn2 = document.getElementById('chatbtn-' + id);
+    if (btn2) { btn2.disabled = false; btn2.textContent = 'Ask Spud'; }
+  }
+}
+
+function resolveConflict(code, id) {
+  const uc = _findUnresolved(code, id);
+  if (!uc) return;
+  const input = document.getElementById('resolve-' + id);
+  const decision = (input ? input.value : '').trim();
+  if (!decision) {
+    alert('Type a final decision before marking resolved.');
+    return;
+  }
+  // Stamp the decision into the summary
+  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
+  const label = uc.kind === 'updated' ? 'Updated' : 'Conflict';
+  const block = '\n\n### Resolved — ' + stamp + '\n\n'
+    + '- **' + label + ' — ' + uc.topic + ':** ' + decision + '\n'
+    + '  _Existing: ' + uc.existing + ' · New: ' + uc.new + '_\n';
+  saved[code].workflow_docs.summary = ((saved[code].workflow_docs.summary || '').replace(/\s*$/, '')) + block;
+  // Remove from unresolved
+  saved[code].workflow_docs.unresolved_conflicts =
+    (saved[code].workflow_docs.unresolved_conflicts || []).filter(u => u.id !== id);
+  saved[code].workflow_docs.summary_generated_at = stamp;
+  openProjects.add(code);
+  workflowOpen.add(code);
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  render();
+  saveAll();
+}
+
+function clearSummary(code) {
+  if (!saved[code] || !saved[code].workflow_docs || !saved[code].workflow_docs.summary) return;
+  const name = saved[code].name || code;
+  if (!confirm('Wipe the workflow summary for ' + name + '? This will also propagate to Claude Code + Spud on save.')) return;
+  saved[code].workflow_docs.summary = '';
+  saved[code].workflow_docs.summary_generated_at = '';
+  saved[code].workflow_docs.file_names = [];
+  delete pickedFiles[code];
+  openProjects.add(code);
+  workflowOpen.add(code);
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  render();
+  saveAll();
+}
+
+function toggleWorkflow(code) {
+  if (workflowOpen.has(code)) workflowOpen.delete(code); else workflowOpen.add(code);
+  const arrow = document.querySelector(`[data-show="${code}"] .wf-arrow`);
+  const body = document.querySelector(`[data-show="${code}"] .workflow-section-body`);
+  if (arrow) arrow.classList.toggle('open', workflowOpen.has(code));
+  if (body) body.classList.toggle('open', workflowOpen.has(code));
+}
+
 function toggleProject(header) {
+  const proj = header.parentElement;
+  const code = proj && proj.dataset.show;
+  const willOpen = !header.querySelector('.arrow').classList.contains('open');
   header.querySelector('.arrow').classList.toggle('open');
   header.nextElementSibling.classList.toggle('open');
+  if (code) {
+    if (willOpen) openProjects.add(code); else openProjects.delete(code);
+  }
+}
+
+function updateStatusPill(code, newStatus) {
+  const pill = document.getElementById('pill-' + code);
+  if (pill) {
+    pill.textContent = newStatus;
+    pill.className = 'status-pill ' + newStatus;
+  }
+  const proj = document.querySelector(`[data-show="${code}"]`);
+  if (proj) proj.dataset.status = newStatus;
+  saved[code].status = newStatus;
+  // Re-apply current tab filter
+  document.querySelectorAll('.project').forEach(el => {
+    const s = el.dataset.status || 'live';
+    el.classList.toggle('hidden', s !== activeTab);
+  });
+  updateTabCounts();
 }
 
 function addContact(code, group) {
-  if (!saved[code]) {
-    const show = SHOWS.find(s => s.code === code);
-    saved[code] = JSON.parse(JSON.stringify(show));
-  }
+  collectInputs();
   saved[code][group].push({ role: '', name: '', email: '', phone: '' });
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  openProjects.add(code);
   render();
-  // Re-open the project
-  const proj = document.querySelector(`[data-show="${code}"]`);
-  proj.querySelector('.arrow').classList.add('open');
-  proj.querySelector('.project-body').classList.add('open');
 }
 
-function saveAll() {
-  const data = {};
-  SHOWS.forEach(show => {
-    data[show.code] = {
-      code: show.code,
-      name: show.name,
-      sgId: show.sgId,
-      production_company: '',
-      post_house: '',
-      contacts: [],
-      post_contacts: []
-    };
-  });
+function addProject() {
+  const code = (prompt('New project code (e.g. ABC)') || '').trim().toUpperCase();
+  if (!code) return;
+  if (saved[code]) { alert('Project ' + code + ' already exists'); return; }
+  const name = (prompt('Project name', code) || code).trim();
+  const sgIdStr = (prompt('ShotGrid project ID (number, optional)') || '').trim();
+  const sgId = sgIdStr ? parseInt(sgIdStr) : null;
+  saved[code] = normalise({ code, name, sgId, status: 'live' });
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  render();
+}
 
-  // Capture dropdowns (selects)
-  document.querySelectorAll('select[data-code]').forEach(sel => {
-    const code = sel.dataset.code;
-    const path = sel.dataset.path;
-    if (path && data[code]) data[code][path] = sel.value;
-  });
-
-  const inputs = document.querySelectorAll('input[data-code]');
-  inputs.forEach(inp => {
-    const code = inp.dataset.code;
-    const path = inp.dataset.path;
-    if (!path) return;
-
+function collectInputs() {
+  document.querySelectorAll('select[data-code], input[data-code]').forEach(el => {
+    const code = el.dataset.code;
+    const path = el.dataset.path;
+    if (!path || !saved[code]) return;
     const parts = path.split('.');
     if (parts.length === 1) {
-      data[code][parts[0]] = inp.value;
+      saved[code][parts[0]] = el.value;
+    } else if (parts.length === 2) {
+      // e.g. workflow_docs.source_path
+      if (!saved[code][parts[0]]) saved[code][parts[0]] = {};
+      saved[code][parts[0]][parts[1]] = el.value;
     } else if (parts.length === 3) {
       const group = parts[0];
       const idx = parseInt(parts[1]);
       const field = parts[2];
-      while (data[code][group].length <= idx) {
-        data[code][group].push({ role: '', name: '', email: '', phone: '' });
-      }
-      data[code][group][idx][field] = inp.value;
+      if (!Array.isArray(saved[code][group])) saved[code][group] = [];
+      while (saved[code][group].length <= idx) saved[code][group].push({ role: '', name: '', email: '', phone: '' });
+      saved[code][group][idx][field] = el.value;
     }
   });
+}
 
-  saved = data;
-  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
+function onFilesPicked(code, fileList) {
+  if (!fileList || fileList.length === 0) return;
+  const existing = pickedFiles[code] || [];
+  const existingNames = new Set(existing.map(f => f.name));
+  const incoming = Array.from(fileList).filter(f => !existingNames.has(f.name));
+  pickedFiles[code] = existing.concat(incoming);
+  openProjects.add(code);
+  workflowOpen.add(code);  // surface the workflow area when docs are added
+  render();
+}
 
-  // Save to server (source of truth) + localStorage (cache)
-  fetch('https://deliver.gbvfx.com/api/reports/contacts', {
+function onDragOver(e, code) {
+  e.preventDefault();
+  e.stopPropagation();
+  const label = document.getElementById('picker-' + code);
+  if (label) label.classList.add('dragging');
+}
+
+function onDragLeave(e, code) {
+  e.preventDefault();
+  e.stopPropagation();
+  const label = document.getElementById('picker-' + code);
+  if (label) label.classList.remove('dragging');
+}
+
+function onDrop(e, code) {
+  e.preventDefault();
+  e.stopPropagation();
+  const label = document.getElementById('picker-' + code);
+  if (label) label.classList.remove('dragging');
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length > 0) onFilesPicked(code, files);
+}
+
+function removePickedFile(code, idx) {
+  if (!pickedFiles[code]) return;
+  pickedFiles[code].splice(idx, 1);
+  if (pickedFiles[code].length === 0) delete pickedFiles[code];
+  openProjects.add(code);
+  render();
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is a data: URL — strip the prefix
+      const dataUrl = reader.result || '';
+      const comma = dataUrl.indexOf(',');
+      resolve({ name: file.name, content_b64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl });
+    };
+    reader.onerror = () => reject(reader.error || new Error('Read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function generateSummary(code) {
+  collectInputs();
+  const files = pickedFiles[code] || [];
+  if (files.length === 0) {
+    alert('Click the workflow docs field and pick one or more files first.');
+    return;
+  }
+  // Size sanity — 50 MB combined ceiling
+  const total = files.reduce((acc, f) => acc + f.size, 0);
+  if (total > 50 * 1024 * 1024) {
+    alert('Combined file size is ' + (total / 1024 / 1024).toFixed(1) + ' MB. Limit is 50 MB — trim your selection.');
+    return;
+  }
+
+  const btn = document.getElementById('gen-' + code);
+  const meta = document.getElementById('meta-' + code);
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.innerHTML = '<span class="spinner"></span>Uploading…';
+  if (meta) meta.innerHTML = '<span class="spinner"></span>Reading ' + files.length + ' file(s) and calling Claude…';
+
+  try {
+    const encoded = await Promise.all(files.map(readFileAsBase64));
+    const existingSummary = (saved[code].workflow_docs && saved[code].workflow_docs.summary) || '';
+    const r = await fetch(API_BASE + '/api/reports/projects/summarise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_TOKEN },
+      body: JSON.stringify({
+        code: code,
+        name: saved[code].name,
+        files: encoded,
+        previous_summary: existingSummary || null
+      })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    btn.disabled = false;
+    btn.textContent = origLabel;
+    if (meta) meta.innerHTML = '<span class="ok">&#9679;</span> Preview ready &mdash; review before approving.';
+    // Remember cumulative file names (union with previously-fed docs)
+    const existingNames = Array.isArray(saved[code].workflow_docs.file_names)
+      ? saved[code].workflow_docs.file_names : [];
+    const newNames = files.map(f => f.name);
+    const union = Array.from(new Set(existingNames.concat(newNames)));
+    saved[code].workflow_docs.file_names = union;
+    openModal(code, data);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = origLabel;
+    if (meta) meta.innerHTML = '<span style="color:#e74c3c;">&#9888; ' + esc(err.message) + '</span>';
+  }
+}
+
+function openModal(code, result) {
+  const rawExtracted = Array.isArray(result.post_house_contacts) ? result.post_house_contacts : [];
+  // Drop anything already present in post_contacts (match by email, case-insensitive)
+  const existingEmailsForFilter = new Set(((saved[code] && saved[code].post_contacts) || [])
+    .map(c => (c.email || '').trim().toLowerCase())
+    .filter(e => e));
+  const extracted = rawExtracted.filter(c => {
+    const e = (c.email || '').trim().toLowerCase();
+    return !(e && existingEmailsForFilter.has(e));
+  });
+  const conflictsList = Array.isArray(result.conflicts) ? result.conflicts : [];
+  modalContext = {
+    code,
+    summary: result.summary,
+    manifest: result.manifest,
+    file_count: result.file_count,
+    post_house_contacts: extracted,
+    conflicts: conflictsList
+  };
+  document.getElementById('modal-title').textContent = 'Summary preview — ' + saved[code].name + ' (' + code + ')';
+
+  // ── Conflicts & Changes panel ──
+  const conflictsPanel = document.getElementById('modal-conflicts');
+  if (conflictsList.length === 0) {
+    conflictsPanel.style.display = 'none';
+    conflictsPanel.innerHTML = '';
+  } else {
+    const cards = conflictsList.map((c, i) => {
+      const kindClass = c.kind === 'updated' ? 'updated' : '';
+      const kindLabel = c.kind === 'updated' ? 'Updated' : 'Conflict';
+      return `<div class="conflict-card ${kindClass}">
+        <div class="kind-topic"><span class="kind-pill">${kindLabel}</span>${esc(c.topic || 'Untitled')}</div>
+        <div class="ev"><span class="ev-label">Existing</span><span class="ev-value">${esc(c.existing || '—')}</span></div>
+        <div class="ev"><span class="ev-label">New</span><span class="ev-value new">${esc(c.new || '—')}</span></div>
+        ${c.recommendation ? `<div class="rec">Recommendation: ${esc(c.recommendation)}</div>` : ''}
+        <label class="decision-label">Your decision</label>
+        <textarea data-conflict-idx="${i}" placeholder="Accept / reject / flag for follow-up / custom note… (blank = leave undecided)"></textarea>
+      </div>`;
+    }).join('');
+    conflictsPanel.innerHTML = `<h3>Conflicts &amp; Changes (${conflictsList.length})</h3>${cards}`;
+    conflictsPanel.style.display = 'block';
+  }
+  document.getElementById('modal-textarea').value = result.summary;
+  const manifestHtml = (result.manifest || []).map(m => `<li>• ${esc(m.name)} <span style="color:#5a6778;">— ${esc(m.status)}</span></li>`).join('');
+  document.getElementById('modal-manifest').innerHTML =
+    `<div style="color:#c8d6e5; margin-bottom:4px;">Files read (${result.file_count}):</div><ul>${manifestHtml}</ul>`;
+
+  // ── Post house contacts panel ──
+  const panel = document.getElementById('modal-contacts');
+  if (extracted.length === 0) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+  } else {
+    const rows = extracted.map((c, idx) => `<label class="modal-contact-row">
+        <input type="checkbox" data-idx="${idx}">
+        <span class="role">${esc(c.role || 'Contact')}</span>
+        <span class="name">${esc(c.name || '—')}</span>
+        <span class="email">${esc(c.email || '')}</span>
+      </label>`).join('');
+    panel.innerHTML = `<h3>New post house contacts found (${extracted.length}) — tick to add</h3>${rows}`;
+    panel.style.display = 'block';
+  }
+
+  document.getElementById('summary-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('summary-modal').classList.remove('open');
+  modalContext = null;
+}
+
+function approveModal() {
+  if (!modalContext) return;
+  const code = modalContext.code;
+  let edited = document.getElementById('modal-textarea').value;
+
+  // Collect Gary's decisions on conflicts/changes and stamp them into the summary.
+  // Any conflict WITHOUT a decision gets pushed onto the project's unresolved_conflicts
+  // list so it persists across reloads and is visible inline in the project card.
+  const decisionTextareas = document.querySelectorAll('#modal-conflicts textarea[data-conflict-idx]');
+  const decisions = [];
+  const unresolvedPending = [];
+  const allConflicts = (modalContext.conflicts || []);
+  allConflicts.forEach((c, idx) => {
+    const ta = document.querySelector(`#modal-conflicts textarea[data-conflict-idx="${idx}"]`);
+    const decision = ta ? (ta.value || '').trim() : '';
+    if (decision) {
+      decisions.push({ kind: c.kind, topic: c.topic, existing: c.existing, new_: c.new, decision });
+    } else {
+      unresolvedPending.push({
+        id: 'c_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).slice(2, 8),
+        kind: c.kind, topic: c.topic, existing: c.existing, new: c.new,
+        recommendation: c.recommendation || '',
+        chat: [],
+        created_at: new Date().toISOString().replace('T', ' ').slice(0, 16)
+      });
+    }
+  });
+  if (decisions.length > 0) {
+    const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const lines = ['', '### Gary\'s Decisions — ' + stamp, ''];
+    decisions.forEach(d => {
+      const label = d.kind === 'updated' ? 'Updated' : 'Conflict';
+      lines.push('- **' + label + ' — ' + d.topic + ':** ' + d.decision);
+      lines.push('  _Existing: ' + d.existing + ' · New: ' + d.new_ + '_');
+    });
+    edited = edited.replace(/\s*$/, '') + '\n' + lines.join('\n') + '\n';
+  }
+
+  saved[code].workflow_docs = saved[code].workflow_docs || {};
+  // Merge unresolved into the project's persistent list (dedupe by topic+existing+new)
+  if (unresolvedPending.length > 0) {
+    if (!Array.isArray(saved[code].workflow_docs.unresolved_conflicts)) {
+      saved[code].workflow_docs.unresolved_conflicts = [];
+    }
+    const existingKeys = new Set(saved[code].workflow_docs.unresolved_conflicts
+      .map(u => (u.topic || '') + '|' + (u.existing || '') + '|' + (u.new || '')));
+    unresolvedPending.forEach(u => {
+      const key = u.topic + '|' + u.existing + '|' + u.new;
+      if (!existingKeys.has(key)) saved[code].workflow_docs.unresolved_conflicts.push(u);
+    });
+  }
+  saved[code].workflow_docs.summary = edited;
+  saved[code].workflow_docs.summary_generated_at = new Date().toISOString().replace('T', ' ').slice(0, 16);
+
+  // Append ticked post-house contacts (dedupe by email case-insensitive)
+  const ticked = document.querySelectorAll('#modal-contacts input[type=checkbox]:checked');
+  if (ticked.length > 0 && modalContext.post_house_contacts) {
+    if (!Array.isArray(saved[code].post_contacts)) saved[code].post_contacts = [];
+    const existingEmails = new Set(saved[code].post_contacts
+      .map(c => (c.email || '').trim().toLowerCase())
+      .filter(e => e));
+    let added = 0;
+    ticked.forEach(cb => {
+      const idx = parseInt(cb.dataset.idx);
+      const c = modalContext.post_house_contacts[idx];
+      if (!c) return;
+      const email = (c.email || '').trim().toLowerCase();
+      if (email && existingEmails.has(email)) return;  // dedupe
+      saved[code].post_contacts.push({
+        role: c.role || 'Post Contact',
+        name: c.name || '',
+        email: c.email || '',
+        phone: c.phone || ''
+      });
+      if (email) existingEmails.add(email);
+      added++;
+    });
+    if (added > 0) openProjects.add(code);
+  }
+
+  // Those files are now folded into the summary — clear the picker chips
+  delete pickedFiles[code];
+
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  closeModal();
+  // Persist to server (which triggers project-brain propagation)
+  saveAll();
+}
+
+function saveAll() {
+  collectInputs();
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+
+  const status = document.getElementById('save-status');
+  status.textContent = 'Saving…';
+  status.style.color = '#f39c12';
+  status.style.display = 'block';
+
+  fetch(API_BASE + '/api/reports/contacts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_TOKEN },
-    body: JSON.stringify(data)
-  }).then(r => {
-    const status = document.getElementById('save-status');
-    status.textContent = r.ok ? 'Saved to server + local' : 'Saved locally (server failed)';
-    status.style.color = r.ok ? '#2ecc71' : '#f39c12';
-    status.style.display = 'block';
-    setTimeout(() => status.style.display = 'none', 3000);
+    body: JSON.stringify(saved)
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const brain = data.brain || {};
+      const bits = [];
+      if (brain.local) bits.push('Claude Code');
+      if (brain.vps) bits.push('Spud');
+      status.textContent = bits.length === 2 ? 'Saved — project brain synced to Claude Code + Spud' :
+                           bits.length === 1 ? 'Saved — synced to ' + bits[0] + ' only (other target failed)' :
+                           'Saved to server — brain sync failed (check agent logs)';
+      status.style.color = bits.length === 2 ? '#2ecc71' : '#f39c12';
+    } else {
+      status.textContent = 'Save failed: ' + (data.error || r.status);
+      status.style.color = '#e74c3c';
+    }
+    // Re-render to show any workflow changes
+    render();
+    setTimeout(() => status.style.display = 'none', 6000);
   }).catch(() => {
-    const status = document.getElementById('save-status');
     status.textContent = 'Saved locally (server unreachable)';
     status.style.color = '#f39c12';
-    status.style.display = 'block';
     setTimeout(() => status.style.display = 'none', 3000);
   });
 }
+
+// Close modal on Esc
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
 
 render();
 </script>
