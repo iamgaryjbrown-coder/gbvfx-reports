@@ -297,8 +297,6 @@ function setStatus(msg, cls) {
 
 async function generateReport() {
   var btn = document.getElementById("generateBtn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Fetching data...';
   setStatus("");
 
   var sel = document.getElementById("projectSelect");
@@ -321,6 +319,28 @@ async function generateReport() {
   if (filterForReview) showVers = true;
   var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
   var reportType = filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status"));
+  var filename = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
+
+  // Ask for save location FIRST while we still have user-gesture context.
+  var saveHandle = null;
+  if (window.showSaveFilePicker) {
+    try {
+      saveHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
+      });
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setStatus("Save cancelled.", "");
+        return;
+      }
+      setStatus("Save dialog failed: " + e.message, "error");
+      return;
+    }
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Fetching data...';
 
   try {
     // Step 1: fetch shot data — pass shot_episodes so thumbnails only download for those
@@ -374,26 +394,13 @@ async function generateReport() {
     }
 
     var blob = await res.blob();
-    var filename = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
 
-    // Prefer native Save As dialog (Chrome/Edge). No auto-save.
-    if (window.showSaveFilePicker) {
-      try {
-        var handle = await window.showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
-        });
-        var writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        setStatus("Saved.", "success");
-      } catch (e) {
-        if (e.name === "AbortError") {
-          setStatus("Save cancelled.", "");
-        } else {
-          setStatus("Save failed: " + e.message, "error");
-        }
-      }
+    if (saveHandle) {
+      // Use the handle we got before the network calls
+      var writable = await saveHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      setStatus("Saved.", "success");
     } else {
       // Fallback (Safari etc.): download to default Downloads folder
       var url = URL.createObjectURL(blob);
