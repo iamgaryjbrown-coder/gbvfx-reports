@@ -337,22 +337,28 @@ function render() {
 
     // ── Contacts ──
     html += `<div class="section-label">Production Contacts</div>`;
+
+    // SG Forms Contact — always shown, one row per project, lists every production contact
+    const sgContactPref = data.sg_forms_contact || '';
+    const sgContactOptions = (data.contacts || [])
+      .filter(c => c.role || c.name)
+      .map(c => {
+        const roleVal = (c.role || '').trim();
+        const label = roleVal + (c.name ? ' — ' + c.name : '');
+        const selected = sgContactPref && roleVal.toLowerCase() === sgContactPref.toLowerCase() ? 'selected' : '';
+        return `<option value="${esc(roleVal)}" ${selected}>${esc(label)}</option>`;
+      }).join('');
+    html += `<div class="contact-row" style="padding: 4px 0;">
+      <div class="role" style="color:#2ecc71;">SG Forms Contact</div>
+      <select data-code="${code}" data-path="sg_forms_contact" style="grid-column: 2 / -1; background:rgba(46,204,113,0.08); border-color:rgba(46,204,113,0.25); color:#2ecc71;">
+        <option value="" ${!sgContactPref ? 'selected' : ''}>-- Select whose name goes on generated forms --</option>
+        ${sgContactOptions}
+      </select>
+    </div>`;
+
     html += `<div class="col-headers"><span>Job Title</span><span>Name</span><span>Email</span><span>Phone</span></div>`;
     data.contacts.forEach((c, ci) => {
       html += contactRow(code, 'contacts', ci, c);
-      if (c.role === 'PPS') {
-        const sgContact = data.sg_forms_contact || '';
-        const producerName = (data.contacts.find(x => x.role === 'Producer') || {}).name || '';
-        const ppsName = c.name || '';
-        html += `<div class="contact-row" style="padding: 4px 0;">
-          <div class="role" style="color:#2ecc71;">SG Forms Contact</div>
-          <select data-code="${code}" data-path="sg_forms_contact" style="grid-column: 2 / -1; background:rgba(46,204,113,0.08); border-color:rgba(46,204,113,0.25); color:#2ecc71;">
-            <option value="" ${!sgContact ? 'selected' : ''}>-- Select --</option>
-            <option value="producer" ${sgContact === 'producer' ? 'selected' : ''}>Producer${producerName ? ' — ' + esc(producerName) : ''}</option>
-            <option value="pps" ${sgContact === 'pps' ? 'selected' : ''}>PPS${ppsName ? ' — ' + esc(ppsName) : ''}</option>
-          </select>
-        </div>`;
-      }
     });
 
     // Add-contact button for production section
