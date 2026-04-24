@@ -242,6 +242,8 @@ let activeTab = 'live';
 let modalContext = null;  // { code, summary, manifest, file_count }
 // Picked File objects per project, keyed by code. Not persisted across reloads.
 const pickedFiles = {};
+// Typed notes per project (draft, in-memory only, cleared after approve).
+const typedNotes = {};
 // Which project cards are currently expanded. Set of project codes.
 const openProjects = new Set();
 let openProjectsInitialised = false;
@@ -446,6 +448,7 @@ function render() {
         <input type="file" id="files-${code}" multiple accept=".pdf,.docx,.doc,.txt,.md,.rtf,.csv,.html,.htm" style="position:absolute; left:-9999px;" onchange="onFilesPicked('${code}', this.files); this.value='';">
         <button class="workflow-btn" id="gen-${code}" onclick="generateSummary('${code}')">${genLabel}</button>
       </div>
+      <textarea id="notes-${code}" oninput="onTypedNote('${code}', this.value)" placeholder="\u2026 or type / paste notes directly (emails, Slack snippets, loose notes). Gets fed to Spud alongside any picked docs." style="width:100%; margin-top:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:8px 10px; color:#fff; font-family:inherit; font-size:12px; line-height:1.5; outline:none; min-height:60px; resize:vertical;">${esc(typedNotes[code] || '')}</textarea>
       <div class="workflow-meta" id="meta-${code}">${
         data.workflow_docs.summary_generated_at
           ? '<span class="ok">&#9679;</span> Summary last generated ' + esc(data.workflow_docs.summary_generated_at) + (hasExistingSummary ? ' &mdash; adding new docs will merge into the existing summary.' : '')
@@ -591,6 +594,7 @@ function clearSummary(code) {
   saved[code].workflow_docs.summary_generated_at = '';
   saved[code].workflow_docs.file_names = [];
   delete pickedFiles[code];
+  delete typedNotes[code];
   openProjects.add(code);
   workflowOpen.add(code);
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
@@ -688,6 +692,11 @@ function onFilesPicked(code, fileList) {
   render();
 }
 
+function onTypedNote(code, value) {
+  // In-memory only — we don't re-render on every keystroke (would lose focus)
+  if (value && value.trim()) typedNotes[code] = value; else delete typedNotes[code];
+}
+
 function onDragOver(e, code) {
   e.preventDefault();
   e.stopPropagation();
@@ -736,11 +745,12 @@ function readFileAsBase64(file) {
 async function generateSummary(code) {
   collectInputs();
   const files = pickedFiles[code] || [];
-  if (files.length === 0) {
-    alert('Click the workflow docs field and pick one or more files first.');
+  const typed = (typedNotes[code] || '').trim();
+  if (files.length === 0 && !typed) {
+    alert('Pick a file, drop a file, or type notes — give Spud something to work with first.');
     return;
   }
-  // Size sanity — 50 MB combined ceiling
+  // Size sanity — 50 MB combined ceiling (typed notes ignored, tiny)
   const total = files.reduce((acc, f) => acc + f.size, 0);
   if (total > 50 * 1024 * 1024) {
     alert('Combined file size is ' + (total / 1024 / 1024).toFixed(1) + ' MB. Limit is 50 MB — trim your selection.');
@@ -756,6 +766,16 @@ async function generateSummary(code) {
 
   try {
     const encoded = await Promise.all(files.map(readFileAsBase64));
+    // If Gary typed free-text notes, wrap them as a synthetic .txt file so
+    // the summariser ingests them the same way it ingests picked docs.
+    if (typed) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+      // Use btoa on utf-8-safe-encoded bytes
+      const utf8 = new TextEncoder().encode(typed);
+      let bin = '';
+      utf8.forEach(b => { bin += String.fromCharCode(b); });
+      encoded.push({ name: 'typed-notes-' + stamp + '.txt', content_b64: btoa(bin) });
+    }
     const existingSummary = (saved[code].workflow_docs && saved[code].workflow_docs.summary) || '';
     const r = await fetch(API_BASE + '/api/reports/projects/summarise', {
       method: 'POST',
@@ -937,8 +957,9 @@ function approveModal() {
     if (added > 0) openProjects.add(code);
   }
 
-  // Those files are now folded into the summary — clear the picker chips
+  // Those files / typed notes are now folded into the summary — clear draft state
   delete pickedFiles[code];
+  delete typedNotes[code];
 
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
   closeModal();
