@@ -181,6 +181,29 @@
   .add-project { max-width: 800px; margin: 20px auto 0; text-align: center; }
   .add-project button { background: none; border: 1px dashed rgba(255,255,255,0.2); color: #7a8a99; padding: 10px 20px; border-radius: 8px; font-size: 12px; cursor: pointer; font-family: inherit; }
   .add-project button:hover { color: #f39c12; border-color: #f39c12; }
+
+  /* QC CONFIG section — structured ground truth for the QC engine.
+     Mirrors workflow-section visual pattern but with form fields, not text. */
+  .qc-config-box { background: rgba(46,134,222,0.04); border: 1px solid rgba(46,134,222,0.18); border-radius: 8px; padding: 14px; margin-top: 8px; }
+  .qc-block { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
+  .qc-block:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .qc-block h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: #5dade2; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .qc-reserved-badge { background: rgba(243,156,18,0.15); color: #f39c12; font-size: 8px; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .qc-toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 0; }
+  .qc-toggle-row input[type=checkbox] { width: 14px; height: 14px; accent-color: #5dade2; cursor: pointer; }
+  .qc-toggle-row label { font-size: 12px; color: #c8d6e5; cursor: pointer; user-select: none; }
+  .qc-disabled { opacity: 0.4; pointer-events: none; }
+  .qc-grid { display: grid; grid-template-columns: 200px 1fr; gap: 6px 10px; align-items: center; }
+  .qc-grid .qc-label { font-size: 11px; color: #7a8a99; padding-right: 4px; }
+  .qc-grid input[type=text], .qc-grid input[type=number], .qc-grid select { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; padding: 6px 8px; font-size: 12px; color: #fff; font-family: 'SF Mono', monospace; outline: none; transition: border-color 0.2s; }
+  .qc-grid input[type=text]:focus, .qc-grid input[type=number]:focus, .qc-grid select:focus { border-color: #5dade2; background: rgba(255,255,255,0.06); }
+  .qc-grid input[type=checkbox] { width: 14px; height: 14px; accent-color: #5dade2; cursor: pointer; justify-self: start; }
+  .qc-grid input.qc-required-empty { border-color: rgba(231,76,60,0.5); background: rgba(231,76,60,0.04); }
+  .qc-hint { font-size: 10px; color: #5a6778; font-style: italic; grid-column: 1 / -1; padding: 2px 0 4px; }
+  .qc-validation-banner { background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; font-size: 11px; color: #e74c3c; display: none; }
+  .qc-validation-banner.open { display: block; }
+  .qc-validation-banner ul { margin: 4px 0 0 18px; }
+  .qc-validation-banner li { margin: 2px 0; font-family: 'SF Mono', monospace; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -249,19 +272,147 @@ const openProjects = new Set();
 let openProjectsInitialised = false;
 // Which project workflow-docs sections are expanded (per project code).
 const workflowOpen = new Set();
+// Which project QC CONFIG sections are expanded (per project code).
+const qcConfigOpen = new Set();
+// Per-project validation errors (computed pre-save). { code: [errStr, ...] }
+const qcValidationErrors = {};
 
 try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) { saved = {}; }
 
-// Fetch from server on load — server is source of truth
+console.log('[contacts-load] localStorage hydrated:',
+  Object.keys(saved).map(c => ({
+    code: c,
+    has_qc_config: saved[c] && saved[c].qc_config !== undefined,
+    frames_expected_start: saved[c] && saved[c].qc_config && saved[c].qc_config.frames
+      ? saved[c].qc_config.frames.expected_start : '(no qc_config)'
+  })));
+
+// Fetch from server on load.
+//
+// Source-of-truth split:
+//   - Server's contacts.json is canonical for: contacts, post_house, workflow_docs,
+//     status, sg_forms_contact, etc.
+//   - localStorage is canonical for: qc_config (the form is the only writer; server
+//     receives qc_config only as a side-effect of the combined save's transactional
+//     commit, which only fires when QC validation passes for ALL live projects).
+//
+// PREVIOUS BUG (fixed 2026-04-25): line 287 read `saved = data` unconditionally,
+// which wiped any qc_config edits the user had typed but not yet successfully
+// committed (because TREA was incomplete → server validation failed → contacts.json
+// never updated → server data has no qc_config → `saved = data` overwrites
+// localStorage's pending qc_config with the qc_config-less server view).
+//
+// Fix: per-project merge — server fields win EXCEPT for qc_config, where
+// localStorage wins if it has one and server doesn't. Once a save succeeds and
+// the server has a committed qc_config, server starts winning automatically.
 fetch(API_BASE + '/api/reports/contacts', { headers: { 'Authorization': 'Bearer ' + API_TOKEN } })
   .then(r => r.json())
   .then(data => {
-    if (data && Object.keys(data).length > 0) {
-      saved = data;
-      localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(data));
-      render();
-    }
-  }).catch(() => {});
+    if (!data || Object.keys(data).length === 0) return;
+    const merged = {};
+    const diag = [];
+    Object.keys(data).forEach(code => {
+      const serverProj = data[code] || {};
+      const localProj = saved[code] || {};
+      // Start from server fields
+      const out = Object.assign({}, serverProj);
+      // qc_config: server wins if present, else preserve localStorage's (form-canonical)
+      const serverHasQc = serverProj.qc_config !== undefined && serverProj.qc_config !== null;
+      const localHasQc = localProj.qc_config !== undefined && localProj.qc_config !== null;
+      if (serverHasQc) {
+        out.qc_config = serverProj.qc_config;
+      } else if (localHasQc) {
+        out.qc_config = localProj.qc_config;
+      }
+      merged[code] = out;
+      diag.push({
+        code,
+        server_has_qc: serverHasQc,
+        local_has_qc: localHasQc,
+        chosen: serverHasQc ? 'server' : (localHasQc ? 'localStorage' : 'none'),
+        frames_expected_start: out.qc_config && out.qc_config.frames
+          ? out.qc_config.frames.expected_start : '(no qc_config)'
+      });
+    });
+    // Carry forward any local-only projects (not on server yet)
+    Object.keys(saved).forEach(code => {
+      if (!(code in merged)) merged[code] = saved[code];
+    });
+    saved = merged;
+    localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+    console.log('[contacts-load] server fetched, qc_config preserved per-project:', diag);
+    render();
+  }).catch(err => {
+    console.warn('[contacts-load] server fetch failed, staying on localStorage:', err);
+  });
+
+// Default QC CONFIG block — all fields present, sections disabled by default
+// so a fresh project shows the full schema but doesn't fail validation just
+// because Gary hasn't filled it in yet (status: live still requires non-disabled
+// sections to be populated; archived projects are validation-exempt).
+function defaultQcConfig() {
+  return {
+    shotgrid_id: null,
+    paths: {
+      server_root: '',
+      ab_returns_folder: '',
+      source_folder: '',
+      source_layout: 'date_then_pkg',
+      delivery_qt_folder: 'DEL/QT',
+      delivery_exr_folder: 'DEL/EXR',
+      dropbox_project_folder: ''
+    },
+    shot_code: {
+      pattern: '',
+      qt_filename_pattern: '',
+      segments: []
+    },
+    ab_inner_layout: {
+      has_resolution_subfolder: true,
+      resolution_subfolder_regex: '\\d+x\\d+'
+    },
+    frames: {
+      expected_start: 1001,
+      has_slate_frame: false,
+      expected_count_rule: 'source_equals',
+      handles: { head: null, tail: null }
+    },
+    resolution: { expected: [], enforce: true },
+    slate: {
+      enabled: false,
+      expected_show: '',
+      expected_vendor: '',
+      expected_status: ''
+    },
+    timecode: { enforce: false, expected_start: '' },
+    diff_qc: { enabled: false, gain: 10, skip_slate_frame: false },
+    resolve: { bin_name: '' },
+    // Reserved — engine ignores in Phase 1
+    editorial_qt_spec: { codec: '', bit_depth: null, width: null, height: null },
+    show_lut: { primary: '', per_shot_lut: false },
+    exr: { expected_compression: '', expected_bit_depth: null, expected_colour_space: '', expected_extension: '.exr' },
+    frame_contiguity: { enforce: false }
+  };
+}
+
+// Deep-merge a partial qc_config onto the default schema so saved data
+// gets any newly-added schema fields without losing existing values.
+function mergeQcConfig(saved) {
+  const def = defaultQcConfig();
+  if (!saved || typeof saved !== 'object') return def;
+  function merge(target, source) {
+    Object.keys(source).forEach(k => {
+      if (source[k] && typeof source[k] === 'object' && !Array.isArray(source[k])
+          && target[k] && typeof target[k] === 'object' && !Array.isArray(target[k])) {
+        merge(target[k], source[k]);
+      } else if (source[k] !== undefined) {
+        target[k] = source[k];
+      }
+    });
+    return target;
+  }
+  return merge(def, saved);
+}
 
 // Normalise a project so all expected fields exist
 function normalise(p) {
@@ -283,7 +434,8 @@ function normalise(p) {
       { role: 'Post Producer', name: '', email: '', phone: '' },
       { role: 'Post Contact', name: '', email: '', phone: '' }
     ],
-    workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {})
+    workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {}),
+    qc_config: mergeQcConfig(p.qc_config)
   };
 }
 
@@ -312,8 +464,366 @@ function updateTabCounts() {
   document.getElementById('count-archived').textContent = archived;
 }
 
+// ── QC CONFIG: deep-path helpers ───────────────────────────────────────────
+function _getDeep(obj, pathStr) {
+  const parts = pathStr.split('.');
+  let cur = obj;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+function _setDeep(obj, pathStr, value) {
+  const parts = pathStr.split('.');
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const p = parts[i];
+    if (cur[p] == null || typeof cur[p] !== 'object') cur[p] = {};
+    cur = cur[p];
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+// Coerce a string input value to the declared type. Empty string for nullable
+// numeric/list fields becomes null/[]; non-coercible inputs return the string
+// unchanged so backend validation surfaces the issue.
+function _coerceQcValue(raw, type) {
+  if (type === 'bool') return !!raw;
+  if (type === 'int') {
+    if (raw === '' || raw == null) return null;
+    const n = parseInt(raw, 10);
+    return isNaN(n) ? raw : n;
+  }
+  if (type === 'str_list') {
+    if (raw == null) return [];
+    return String(raw).split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
+  return raw == null ? '' : String(raw);
+}
+
+// Walk the form, collect all [data-qc-code] inputs into saved[code].qc_config.
+function collectQcInputs() {
+  let count = 0;
+  document.querySelectorAll('[data-qc-code]').forEach(el => {
+    const code = el.dataset.qcCode;
+    const path = el.dataset.qcPath;
+    const type = el.dataset.qcType || 'str';
+    if (!code || !path || !saved[code] || !saved[code].qc_config) return;
+    let raw;
+    if (el.type === 'checkbox') raw = el.checked;
+    else raw = el.value;
+    _setDeep(saved[code].qc_config, path, _coerceQcValue(raw, type));
+    count++;
+  });
+  // Diagnostic: dump the post-collect frames state for every live project so
+  // we can prove what made it into saved before validation/render.
+  const diag = {};
+  Object.keys(saved).forEach(c => {
+    const fr = saved[c] && saved[c].qc_config && saved[c].qc_config.frames;
+    diag[c] = fr ? {
+      expected_start: fr.expected_start,
+      has_slate_frame: fr.has_slate_frame,
+      expected_count_rule: fr.expected_count_rule
+    } : '(no qc_config.frames)';
+  });
+  console.log('[qc-config diag] collectQcInputs wrote', count, 'fields. Frames now:', diag);
+}
+
+// Mirrors backend project_config.validate_block. Returns array of error strings
+// keyed by [code]. Live projects validated; archived projects skipped.
+function validateQcConfig() {
+  const out = {};
+  Object.keys(saved).forEach(code => {
+    const proj = saved[code];
+    if ((proj.status || 'live').toLowerCase() !== 'live') return;
+    const errs = [];
+    const cfg = proj.qc_config || {};
+    const tag = '[' + code + ']';
+    const reqStr = (path) => {
+      const v = _getDeep(cfg, path);
+      if (typeof v !== 'string' || v.trim() === '') {
+        errs.push(tag + ' ' + path + ' required');
+      }
+    };
+    const reqInt = (path) => {
+      const v = _getDeep(cfg, path);
+      if (typeof v !== 'number' || !Number.isInteger(v)) {
+        errs.push(tag + ' ' + path + ' required (int)');
+      }
+    };
+    const reqBool = (path) => {
+      const v = _getDeep(cfg, path);
+      if (typeof v !== 'boolean') errs.push(tag + ' ' + path + ' required (bool)');
+    };
+    reqInt('shotgrid_id');
+    ['server_root','ab_returns_folder','source_folder','source_layout',
+     'delivery_qt_folder','delivery_exr_folder','dropbox_project_folder']
+      .forEach(k => reqStr('paths.' + k));
+    const layout = _getDeep(cfg, 'paths.source_layout');
+    if (layout && layout !== 'date_then_pkg' && layout !== 'pkg_per_folder') {
+      errs.push(tag + ' paths.source_layout must be date_then_pkg or pkg_per_folder');
+    }
+    reqStr('shot_code.pattern');
+    reqStr('shot_code.qt_filename_pattern');
+    const segs = _getDeep(cfg, 'shot_code.segments');
+    if (!Array.isArray(segs) || segs.length === 0) {
+      errs.push(tag + ' shot_code.segments required (non-empty list, comma-separated)');
+    }
+    reqBool('ab_inner_layout.has_resolution_subfolder');
+    if (_getDeep(cfg, 'ab_inner_layout.has_resolution_subfolder') === true) {
+      reqStr('ab_inner_layout.resolution_subfolder_regex');
+    }
+    reqInt('frames.expected_start');
+    reqBool('frames.has_slate_frame');
+    const rule = _getDeep(cfg, 'frames.expected_count_rule');
+    if (rule !== 'source_plus_one' && rule !== 'source_equals') {
+      errs.push(tag + ' frames.expected_count_rule must be source_plus_one or source_equals');
+    }
+    reqBool('resolution.enforce');
+    reqBool('slate.enabled');
+    if (_getDeep(cfg, 'slate.enabled') === true) {
+      reqStr('slate.expected_show');
+      reqStr('slate.expected_vendor');
+      reqStr('slate.expected_status');
+    }
+    reqBool('timecode.enforce');
+    if (_getDeep(cfg, 'timecode.enforce') === true) {
+      reqStr('timecode.expected_start');
+    }
+    reqBool('diff_qc.enabled');
+    if (_getDeep(cfg, 'diff_qc.enabled') === true) {
+      reqInt('diff_qc.gain');
+      reqBool('diff_qc.skip_slate_frame');
+    }
+    reqStr('resolve.bin_name');
+    if (errs.length > 0) out[code] = errs;
+  });
+  return out;
+}
+
+// ── QC CONFIG: HTML builders ───────────────────────────────────────────────
+function qcStrInput(code, path, opts) {
+  opts = opts || {};
+  const v = _getDeep(saved[code].qc_config, path);
+  const safe = esc(v == null ? '' : v);
+  const ph = opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '';
+  return '<input type="text" data-qc-code="' + code + '" data-qc-path="' + path
+       + '" data-qc-type="str" value="' + safe + '"' + ph + '>';
+}
+function qcIntInput(code, path, opts) {
+  opts = opts || {};
+  const v = _getDeep(saved[code].qc_config, path);
+  const safe = (v == null ? '' : v);
+  const ph = opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '';
+  return '<input type="number" data-qc-code="' + code + '" data-qc-path="' + path
+       + '" data-qc-type="int" value="' + safe + '"' + ph + '>';
+}
+function qcBoolInput(code, path) {
+  const v = _getDeep(saved[code].qc_config, path);
+  return '<input type="checkbox" data-qc-code="' + code + '" data-qc-path="' + path
+       + '" data-qc-type="bool"' + (v ? ' checked' : '') + '>';
+}
+function qcSelectInput(code, path, options) {
+  const v = _getDeep(saved[code].qc_config, path);
+  const opts = options.map(o =>
+    '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>'
+  ).join('');
+  return '<select data-qc-code="' + code + '" data-qc-path="' + path + '" data-qc-type="str">'
+       + opts + '</select>';
+}
+function qcStrListInput(code, path, opts) {
+  opts = opts || {};
+  const v = _getDeep(saved[code].qc_config, path);
+  const joined = Array.isArray(v) ? v.join(', ') : '';
+  const ph = opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '';
+  return '<input type="text" data-qc-code="' + code + '" data-qc-path="' + path
+       + '" data-qc-type="str_list" value="' + esc(joined) + '"' + ph + '>';
+}
+
+function qcRow(label, inputHtml, hint) {
+  const hintHtml = hint ? '<div class="qc-hint">' + esc(hint) + '</div>' : '';
+  return '<div class="qc-label">' + esc(label) + '</div><div>' + inputHtml + '</div>' + hintHtml;
+}
+
+function qcSectionBlock(title, bodyHtml, opts) {
+  opts = opts || {};
+  const reservedBadge = opts.reserved
+    ? '<span class="qc-reserved-badge">RESERVED — not yet enforced</span>' : '';
+  return '<div class="qc-block"><h4>' + esc(title) + reservedBadge + '</h4>'
+       + '<div class="qc-grid">' + bodyHtml + '</div></div>';
+}
+
+function qcEnableToggle(code, path, label) {
+  const v = _getDeep(saved[code].qc_config, path);
+  return '<div class="qc-toggle-row">'
+    + '<input type="checkbox" id="qc-en-' + code + '-' + path.replace(/\./g, '_') + '"'
+    + (v ? ' checked' : '') + ' onchange="toggleQcSection(\'' + code + '\', \'' + path + '\')">'
+    + '<label for="qc-en-' + code + '-' + path.replace(/\./g, '_') + '">' + esc(label) + '</label>'
+    + '</div>';
+}
+
+function qcConfigBody(code, data) {
+  const cfg = data.qc_config || defaultQcConfig();
+  const slateEnabled = _getDeep(cfg, 'slate.enabled') === true;
+  const tcEnabled = _getDeep(cfg, 'timecode.enforce') === true;
+  const diffEnabled = _getDeep(cfg, 'diff_qc.enabled') === true;
+  const hasResSub = _getDeep(cfg, 'ab_inner_layout.has_resolution_subfolder') === true;
+
+  const errsForCode = qcValidationErrors[code] || [];
+  const errsBanner = errsForCode.length === 0 ? '' :
+    '<div class="qc-validation-banner open">'
+    + '<strong>Validation errors (must fix before save):</strong>'
+    + '<ul>' + errsForCode.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul></div>';
+
+  let html = '<div class="qc-config-box">' + errsBanner;
+
+  // Identity
+  html += qcSectionBlock('Identity',
+    qcRow('ShotGrid project ID', qcIntInput(code, 'shotgrid_id', { placeholder: '386' }),
+          'Numeric SG project_id. Replaces the duplicate in agent config.json (Phase 4).'));
+
+  // Paths
+  html += qcSectionBlock('Paths (server-relative)',
+    qcRow('Server root', qcStrInput(code, 'paths.server_root', { placeholder: 'BLM' }),
+          'Subdir under /Volumes/desktop-j2eqsn2/')
+    + qcRow('AB returns folder', qcStrInput(code, 'paths.ab_returns_folder', { placeholder: 'FROM_AB' }))
+    + qcRow('Source folder', qcStrInput(code, 'paths.source_folder', { placeholder: 'FROM_HARBOR' }))
+    + qcRow('Source layout', qcSelectInput(code, 'paths.source_layout', ['date_then_pkg', 'pkg_per_folder']),
+            'date_then_pkg = <date>/<shot>_pkg/<shot>/<WxH>/ (BLM). pkg_per_folder = <pkg>/<shot>/... (TREA).')
+    + qcRow('Delivery QT folder', qcStrInput(code, 'paths.delivery_qt_folder'))
+    + qcRow('Delivery EXR folder', qcStrInput(code, 'paths.delivery_exr_folder'))
+    + qcRow('Dropbox project folder', qcStrInput(code, 'paths.dropbox_project_folder', { placeholder: 'Bloomers' }),
+            'Folder name under ~/Dropbox/GBVFX/Projects/'));
+
+  // Shot code
+  html += qcSectionBlock('Shot code patterns',
+    qcRow('Folder regex (with named captures)', qcStrInput(code, 'shot_code.pattern',
+          { placeholder: '^(?P<shot_code>[A-Z]+_\\d+_\\d+)_(?P<version>V\\d+)(?:_(?P<option>op\\d+))?$' }),
+          'Anchored regex matching shot folder names in AB returns. Capture groups: shot_code, version, option.')
+    + qcRow('QT filename regex', qcStrInput(code, 'shot_code.qt_filename_pattern',
+          { placeholder: '^(?P<project>[A-Z]+)_(?P<ep>\\d+)_(?P<shot>\\d+)(?:_(?P<pass>[A-Z]+\\d+))?_V(?P<version>\\d+)(?:_(?P<option>op\\d+))?\\.(?:mov|mp4)$' }),
+          'Used by parser.py for incoming QT files.')
+    + qcRow('Segments (comma-separated)', qcStrListInput(code, 'shot_code.segments', { placeholder: 'project, ep, shot' }),
+            'Semantic names for each underscore-separated segment.'));
+
+  // AB inner layout
+  html += qcSectionBlock('AB inner layout',
+    qcRow('Has resolution subfolder', qcBoolInput(code, 'ab_inner_layout.has_resolution_subfolder'),
+          'true = <shot>/<WxH>/<frames>.exr (BLM). false = <shot>/<frames>.exr (TREA).')
+    + (hasResSub
+        ? qcRow('Resolution subfolder regex', qcStrInput(code, 'ab_inner_layout.resolution_subfolder_regex',
+                { placeholder: '\\d+x\\d+' }))
+        : ''));
+
+  // Frames
+  html += qcSectionBlock('Frames',
+    qcRow('Expected start frame', qcIntInput(code, 'frames.expected_start', { placeholder: '1000 or 1001' }),
+          'First frame on disk in returns. BLM=1000 (slate). TREA=1001 (no slate).')
+    + qcRow('Has slate frame', qcBoolInput(code, 'frames.has_slate_frame'),
+            'true = vendor adds an extra slate frame at expected_start (BLM convention).')
+    + qcRow('Expected count rule', qcSelectInput(code, 'frames.expected_count_rule', ['source_plus_one', 'source_equals']),
+            'source_plus_one = AB returns slate + source frames. source_equals = AB returns same range as source.')
+    + qcRow('Handles head (reserved)', qcIntInput(code, 'frames.handles.head'),
+            'RESERVED — store the value, no enforcement in Phase 1.')
+    + qcRow('Handles tail (reserved)', qcIntInput(code, 'frames.handles.tail'),
+            'RESERVED — store the value, no enforcement in Phase 1.'));
+
+  // Resolution
+  html += qcSectionBlock('Resolution',
+    qcRow('Enforce resolution check', qcBoolInput(code, 'resolution.enforce'),
+          'false = log mismatch but do not fail (TREA dual-format).')
+    + qcRow('Expected resolutions (comma-separated, optional)', qcStrListInput(code, 'resolution.expected',
+            { placeholder: '4608x3164, 4608x2094' }),
+            'Empty = derive from source folder name (BLM). List = enforce one of these.'));
+
+  // Slate (gated)
+  html += '<div class="qc-block"><h4>Slate OCR</h4>'
+       + qcEnableToggle(code, 'slate.enabled', 'Enable slate OCR checks')
+       + '<div class="qc-grid' + (slateEnabled ? '' : ' qc-disabled') + '">'
+       + qcRow('Expected show', qcStrInput(code, 'slate.expected_show', { placeholder: 'BLOOMERS' }))
+       + qcRow('Expected vendor', qcStrInput(code, 'slate.expected_vendor', { placeholder: 'GBVFX' }))
+       + qcRow('Expected status', qcStrInput(code, 'slate.expected_status', { placeholder: 'PAF' }))
+       + '</div></div>';
+
+  // Timecode (gated)
+  html += '<div class="qc-block"><h4>Timecode</h4>'
+       + qcEnableToggle(code, 'timecode.enforce', 'Enforce timecode start')
+       + '<div class="qc-grid' + (tcEnabled ? '' : ' qc-disabled') + '">'
+       + qcRow('Expected TC start', qcStrInput(code, 'timecode.expected_start', { placeholder: '0:0:41:16' }))
+       + '</div></div>';
+
+  // Diff QC (gated)
+  html += '<div class="qc-block"><h4>EXR Diff QC</h4>'
+       + qcEnableToggle(code, 'diff_qc.enabled', 'Enable diff QC + SG diff Version upload')
+       + '<div class="qc-grid' + (diffEnabled ? '' : ' qc-disabled') + '">'
+       + qcRow('Brightness gain (--mulc)', qcIntInput(code, 'diff_qc.gain', { placeholder: '10' }))
+       + qcRow('Skip slate frame in diff', qcBoolInput(code, 'diff_qc.skip_slate_frame'),
+               'Should equal frames.has_slate_frame for self-consistency.')
+       + '</div></div>';
+
+  // Resolve
+  html += qcSectionBlock('Resolve import',
+    qcRow('Resolve project / bin name', qcStrInput(code, 'resolve.bin_name', { placeholder: 'BLM VERSIONS' })));
+
+  // Reserved blocks (visual only — engine ignores in Phase 1)
+  html += qcSectionBlock('Editorial QT spec',
+    qcRow('Codec', qcStrInput(code, 'editorial_qt_spec.codec', { placeholder: 'DNxHD36' }))
+    + qcRow('Bit depth', qcIntInput(code, 'editorial_qt_spec.bit_depth', { placeholder: '8' }))
+    + qcRow('Width', qcIntInput(code, 'editorial_qt_spec.width', { placeholder: '1920' }))
+    + qcRow('Height', qcIntInput(code, 'editorial_qt_spec.height', { placeholder: '1080' })),
+    { reserved: true });
+
+  html += qcSectionBlock('Show LUT',
+    qcRow('Primary LUT', qcStrInput(code, 'show_lut.primary', { placeholder: 'TI_V11_desat48_aces' }))
+    + qcRow('Per-shot LUT', qcBoolInput(code, 'show_lut.per_shot_lut'),
+            'true = each shot ships its own LUT (TOM/Company-3 pattern).'),
+    { reserved: true });
+
+  html += qcSectionBlock('EXR metadata',
+    qcRow('Compression', qcSelectInput(code, 'exr.expected_compression', ['', 'piz', 'zip', 'zips', 'none']))
+    + qcRow('Bit depth', qcIntInput(code, 'exr.expected_bit_depth', { placeholder: '16' }))
+    + qcRow('Colour space', qcStrInput(code, 'exr.expected_colour_space', { placeholder: 'ACES 2065-1 AP0 linear' }))
+    + qcRow('Extension', qcStrInput(code, 'exr.expected_extension', { placeholder: '.exr' })),
+    { reserved: true });
+
+  html += qcSectionBlock('Frame contiguity',
+    qcRow('Enforce contiguity', qcBoolInput(code, 'frame_contiguity.enforce'),
+          'true = fail if gaps in numbered sequence.'),
+    { reserved: true });
+
+  html += '</div>';
+  return html;
+}
+
+function qcConfigSection(code, data) {
+  const isOpen = qcConfigOpen.has(code);
+  const errsForCode = qcValidationErrors[code] || [];
+  const badge = errsForCode.length > 0
+    ? '<span class="wf-badge" style="color:#e74c3c;">&#9888; ' + errsForCode.length + ' validation error(s)</span>'
+    : '';
+  let html = '<div class="workflow-section-header" onclick="toggleQcConfig(\'' + code + '\')">'
+    + '<span class="wf-arrow qc-arrow' + (isOpen ? ' open' : '') + '">&#9654;</span>'
+    + '<span class="wf-label" style="color:#5dade2;">QC Config &mdash; structured ground truth</span>'
+    + badge + '</div>';
+  html += '<div class="workflow-section-body qc-config-section-body' + (isOpen ? ' open' : '') + '">'
+    + qcConfigBody(code, data) + '</div>';
+  return html;
+}
+
 function render() {
   ensureSeeded();
+  // Diagnostic: dump frames state at each render so reverts are observable
+  const diag = {};
+  Object.keys(saved).forEach(c => {
+    const fr = saved[c] && saved[c].qc_config && saved[c].qc_config.frames;
+    diag[c] = fr ? {
+      expected_start: fr.expected_start,
+      has_slate_frame: fr.has_slate_frame,
+      expected_count_rule: fr.expected_count_rule
+    } : '(no qc_config.frames)';
+  });
+  console.log('[qc-config diag] render() — frames per project:', diag);
   const container = document.getElementById('projects');
   container.innerHTML = '';
 
@@ -460,6 +970,9 @@ function render() {
       </div>` : ''}
     </div>
     </div>`;
+
+    // ── QC CONFIG section (structured ground truth for QC engine) ──
+    html += qcConfigSection(code, data);
 
     const hidden = status !== activeTab ? 'hidden' : '';
     const pillClass = status === 'archived' ? 'archived' : 'live';
@@ -608,6 +1121,30 @@ function toggleWorkflow(code) {
   const body = document.querySelector(`[data-show="${code}"] .workflow-section-body`);
   if (arrow) arrow.classList.toggle('open', workflowOpen.has(code));
   if (body) body.classList.toggle('open', workflowOpen.has(code));
+}
+
+function toggleQcConfig(code) {
+  if (qcConfigOpen.has(code)) qcConfigOpen.delete(code); else qcConfigOpen.add(code);
+  const arrow = document.querySelector(`[data-show="${code}"] .qc-arrow`);
+  const body = document.querySelector(`[data-show="${code}"] .qc-config-section-body`);
+  if (arrow) arrow.classList.toggle('open', qcConfigOpen.has(code));
+  if (body) body.classList.toggle('open', qcConfigOpen.has(code));
+}
+
+// Toggle a section enable checkbox; re-render to apply qc-disabled visual state
+// to dependent fields. Stays here rather than in collectQcInputs so the
+// enable/disable styling updates immediately.
+function toggleQcSection(code, sectionPath) {
+  collectQcInputs();
+  const v = _getDeep(saved[code].qc_config, sectionPath);
+  _setDeep(saved[code].qc_config, sectionPath, !v);
+  localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
+  // Re-render only this project's QC section to preserve scroll/focus
+  const projEl = document.querySelector(`[data-show="${code}"]`);
+  if (projEl) {
+    const qcBody = projEl.querySelector('.qc-config-section-body');
+    if (qcBody) qcBody.innerHTML = qcConfigBody(code, saved[code]);
+  }
 }
 
 function toggleProject(header) {
@@ -967,11 +1504,82 @@ function approveModal() {
   saveAll();
 }
 
+// Shared failure-surfacing handler for QC config validation rejections,
+// from either the frontend pre-flight or the backend 400 response. Ensures:
+//   - Every affected project card AND its QC Config section is auto-expanded
+//     so the per-project red error banner is visible (the banner HTML is
+//     always present in qcConfigBody output, but is hidden when the parent
+//     section/project is collapsed).
+//   - The top status banner lists actual field names (truncated to 5 with
+//     "+N more — see banners below"), not just an opaque count.
+//   - The full error list is dumped to the browser console so power users
+//     can inspect every rejected field even with the inline banners visible.
+//   - render() is invoked so all banner DOM and expand-state updates flush
+//     in a single repaint.
+//
+// `errsByCode` shape: {projectCode: [errString, ...], ...}
+// `headline`: leading text for the status banner.
+function _showQcValidationFailure(headline, errsByCode) {
+  const status = document.getElementById('save-status');
+  const codes = Object.keys(errsByCode);
+  const flat = [];
+  codes.forEach(c => (errsByCode[c] || []).forEach(e => flat.push(e)));
+
+  // Forensic dump — full list, never truncated.
+  console.error('[qc-config validation] ' + headline + ' (' + flat.length
+                + ' issue(s) across: ' + codes.join(', ') + ')');
+  console.error('[qc-config validation] full error list:', flat);
+
+  // Auto-expand affected project cards AND their QC Config sub-sections so
+  // the inline banners are guaranteed visible after render().
+  codes.forEach(c => {
+    if (c === '_') return;  // orphan bucket — no project to expand
+    openProjects.add(c);
+    qcConfigOpen.add(c);
+  });
+
+  // Build a status-banner preview: first 5 errors verbatim, plus a tail.
+  const PREVIEW_N = 5;
+  const preview = flat.slice(0, PREVIEW_N).map(e => '• ' + e).join('\n');
+  const tail = flat.length > PREVIEW_N
+    ? '\n• … and ' + (flat.length - PREVIEW_N) + ' more — see per-project banners below'
+    : '';
+  status.textContent = headline + ' — ' + flat.length + ' issue(s):\n' + preview + tail;
+  status.style.color = '#e74c3c';
+  status.style.whiteSpace = 'pre-line';   // honour the \n's
+  status.style.textAlign = 'left';
+  status.style.display = 'block';
+
+  render();
+
+  // Keep the banner up longer when there's a lot to read; minimum 12s.
+  const visibleMs = Math.min(30000, Math.max(12000, flat.length * 800));
+  setTimeout(() => {
+    status.style.display = 'none';
+    // Restore default centred styling for subsequent successful saves
+    status.style.whiteSpace = '';
+    status.style.textAlign = '';
+  }, visibleMs);
+}
+
 function saveAll() {
   collectInputs();
+  collectQcInputs();
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
 
   const status = document.getElementById('save-status');
+
+  // Pre-flight QC config validation. Mirrors backend; surfaces errors inline
+  // before the POST so Gary doesn't have to wait on a 400 to learn what's missing.
+  const errs = validateQcConfig();
+  // Reset prior error state
+  Object.keys(qcValidationErrors).forEach(k => delete qcValidationErrors[k]);
+  Object.assign(qcValidationErrors, errs);
+  if (Object.keys(errs).length > 0) {
+    _showQcValidationFailure('Save blocked (frontend pre-flight)', errs);
+    return;
+  }
+
   status.textContent = 'Saving…';
   status.style.color = '#f39c12';
   status.style.display = 'block';
@@ -984,20 +1592,39 @@ function saveAll() {
     const data = await r.json().catch(() => ({}));
     if (r.ok) {
       const brain = data.brain || {};
+      const qc = data.qc_config || {};
       const bits = [];
       if (brain.local) bits.push('Claude Code');
       if (brain.vps) bits.push('Spud');
-      status.textContent = bits.length === 2 ? 'Saved — project brain synced to Claude Code + Spud' :
-                           bits.length === 1 ? 'Saved — synced to ' + bits[0] + ' only (other target failed)' :
-                           'Saved to server — brain sync failed (check agent logs)';
+      const brainPart = bits.length === 2 ? 'project brain synced to Claude Code + Spud' :
+                        bits.length === 1 ? 'synced to ' + bits[0] + ' only (other target failed)' :
+                        'brain sync failed (check agent logs)';
+      const qcPart = qc.sha256 ? ' · QC config sha256=' + qc.sha256.slice(0, 12)
+                                  + ' (backup: ' + (qc.backup_status || 'n/a') + ')'
+                                : '';
+      status.textContent = 'Saved — ' + brainPart + qcPart;
       status.style.color = bits.length === 2 ? '#2ecc71' : '#f39c12';
+    } else if (r.status === 400 && Array.isArray(data.details)) {
+      // Backend QC validation rejection — surface details and treat as a
+      // first-class failure (auto-expand projects + QC sections, console.error,
+      // listful status banner). Mirrors pre-flight UX so the user is never blind.
+      Object.keys(qcValidationErrors).forEach(k => delete qcValidationErrors[k]);
+      data.details.forEach(d => {
+        const m = /^\[([A-Z]+)\]/.exec(d);
+        const c = m ? m[1] : '_';
+        if (!qcValidationErrors[c]) qcValidationErrors[c] = [];
+        qcValidationErrors[c].push(d);
+      });
+      _showQcValidationFailure('Save rejected by backend (' + (data.error || 'validation') + ')',
+                               qcValidationErrors);
+      return;  // _showQcValidationFailure already called render() + status
     } else {
       status.textContent = 'Save failed: ' + (data.error || r.status);
       status.style.color = '#e74c3c';
     }
-    // Re-render to show any workflow changes
+    // Re-render to show any workflow changes / validation banners
     render();
-    setTimeout(() => status.style.display = 'none', 6000);
+    setTimeout(() => status.style.display = 'none', 8000);
   }).catch(() => {
     status.textContent = 'Saved locally (server unreachable)';
     status.style.color = '#f39c12';
