@@ -89,6 +89,13 @@
   <div class="check-group">
     <label><input type="checkbox" id="filterUninvoiced"> To Be Invoiced</label>
     <label><input type="checkbox" id="filterForReview"> For Review</label>
+    <label><input type="checkbox" id="filterBidding"> Bidding</label>
+  </div>
+  <div class="field" style="margin-top:4px;">
+    <label>Vendor</label>
+    <select id="filterVendor">
+      <option value="">All vendors</option>
+    </select>
   </div>
 </div>
 
@@ -142,6 +149,7 @@ if (TOKEN) {
   loadProjects().then(function() {
     document.getElementById("connDot").classList.add("ok");
     document.getElementById("connBtn").textContent = "Connected";
+    loadVendors();
   }).catch(function() {
     document.getElementById("connDot").classList.remove("ok");
   });
@@ -150,6 +158,26 @@ if (TOKEN) {
 // Show/hide cost fields based on checkbox
 document.getElementById("colCost").addEventListener("change", function() {
   document.getElementById("costFields").style.display = this.checked ? "block" : "none";
+});
+
+// Bidding preset: a mode that fixes status to "bid" and drops the summary page.
+// Conflicting status-mode filters (Uninvoiced / For Review) are unticked + disabled;
+// the Vendor dropdown stays active (orthogonal axis). Summary-Page episode grid is
+// greyed (no effect with no summary). No prior-state restore on un-tick.
+function setFilterDisabled(input, disabled) {
+  input.disabled = disabled;
+  if (input.parentElement) input.parentElement.style.opacity = disabled ? "0.4" : "1";
+}
+document.getElementById("filterBidding").addEventListener("change", function() {
+  var on = this.checked;
+  var uninv = document.getElementById("filterUninvoiced");
+  var forrev = document.getElementById("filterForReview");
+  if (on) { uninv.checked = false; forrev.checked = false; }
+  setFilterDisabled(uninv, on);
+  setFilterDisabled(forrev, on);
+  var sumGrid = document.getElementById("episodeGrid");
+  sumGrid.style.opacity = on ? "0.4" : "1";
+  sumGrid.style.pointerEvents = on ? "none" : "auto";
 });
 
 async function apiFetch(path, options) {
@@ -169,6 +197,7 @@ async function saveToken() {
   document.getElementById("tokenInput").value = "••••••••";
   try {
     await loadProjects();
+    loadVendors();
     document.getElementById("connDot").classList.add("ok");
     document.getElementById("connBtn").textContent = "Connected";
     setStatus("Connected!", "success");
@@ -188,6 +217,20 @@ async function loadProjects() {
     html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '">' + p.name + ' (' + p.code + ')</option>';
   });
   sel.innerHTML = html;
+}
+
+async function loadVendors() {
+  try {
+    var data = await apiFetch("/api/reports/vendors");
+    var sel = document.getElementById("filterVendor");
+    var html = '<option value="">All vendors</option>';
+    (data.vendors || []).forEach(function(v) {
+      html += '<option value="' + v + '">' + v + '</option>';
+    });
+    sel.innerHTML = html;
+  } catch (e) {
+    // leave the default "All vendors" option in place
+  }
 }
 
 async function resolveContact(code) {
@@ -315,10 +358,12 @@ async function generateReport() {
   var showProd = false;
   var filterUninvoiced = document.getElementById("filterUninvoiced").checked;
   var filterForReview = document.getElementById("filterForReview").checked;
+  var filterBidding = document.getElementById("filterBidding").checked;
+  var filterVendor = document.getElementById("filterVendor").value;
   // For Review always includes Vers With Edit
   if (filterForReview) showVers = true;
   var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  var reportType = filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status"));
+  var reportType = filterBidding ? "Bidding" : (filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status")));
   var filename = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
 
   // Ask for save location FIRST while we still have user-gesture context.
@@ -352,7 +397,9 @@ async function generateReport() {
         episodes: ["all"],
         thumb_episodes: shotEpisodes,
         filter_uninvoiced: filterUninvoiced,
-        filter_for_review: filterForReview
+        filter_for_review: filterForReview,
+        filter_vendor: filterVendor,
+        filter_bidding: filterBidding
       }),
     });
 
@@ -376,7 +423,8 @@ async function generateReport() {
       show_present_next: showPresentNext,
       show_invoiced: showInvoiced,
       show_prod: showProd,
-      report_title: filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : null),
+      skip_summary: filterBidding,
+      report_title: filterBidding ? "SHOTS IN BIDDING" : (filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : null)),
       filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
