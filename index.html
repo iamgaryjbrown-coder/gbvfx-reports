@@ -321,7 +321,7 @@ function getSelectedEpisodes(prefix) {
   if (document.getElementById(allId) && document.getElementById(allId).checked) return ["all"];
   var selected = [];
   document.querySelectorAll(cls + ":checked").forEach(function(cb) { selected.push(cb.value); });
-  return selected.length > 0 ? selected : ["all"];
+  return selected;
 }
 
 function parseExtraLines(str) {
