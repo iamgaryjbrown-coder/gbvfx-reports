@@ -91,6 +91,7 @@
     <label><input type="checkbox" id="filterForReview"> For Review</label>
     <label><input type="checkbox" id="filterBidding"> Bidding</label>
     <label><input type="checkbox" id="filterGbFocus"> GB Focus</label>
+    <label id="postGradeFilterWrap" style="display:none"><input type="checkbox" id="filterPostGrade"> Post Grade</label>
   </div>
   <div class="field" style="margin-top:4px;">
     <label>Vendor</label>
@@ -168,6 +169,11 @@ document.getElementById("colCost").addEventListener("change", function() {
 function setFilterDisabled(input, disabled) {
   input.disabled = disabled;
   if (input.parentElement) input.parentElement.style.opacity = disabled ? "0.4" : "1";
+}
+function setPostGradeVisible(show) {
+  var wrap = document.getElementById("postGradeFilterWrap");
+  wrap.style.display = show ? "" : "none";
+  if (!show) document.getElementById("filterPostGrade").checked = false;
 }
 document.getElementById("filterBidding").addEventListener("change", function() {
   var on = this.checked;
@@ -256,10 +262,15 @@ async function onProjectChange() {
     document.getElementById("episodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
     document.getElementById("shotEpisodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
     document.getElementById("generateBtn").disabled = true;
+    setPostGradeVisible(false);
     return;
   }
   var opt = sel.options[sel.selectedIndex];
   var code = opt.dataset.code;
+
+  // Post Grade is a TREA-only field (sg_post_grade) — show the filter only for TREA,
+  // and clear any stale tick when switching to another show.
+  setPostGradeVisible(code === "TREA");
 
   // Resolve contact from server-side contacts, fallback to API data
   var resolved = await resolveContact(code);
@@ -362,6 +373,7 @@ async function generateReport() {
   var filterBidding = document.getElementById("filterBidding").checked;
   var filterVendor = document.getElementById("filterVendor").value;
   var filterGbFocus = document.getElementById("filterGbFocus").checked;
+  var filterPostGrade = document.getElementById("filterPostGrade").checked;
   // For Review always includes Vers With Edit
   if (filterForReview) showVers = true;
   var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
@@ -402,7 +414,8 @@ async function generateReport() {
         filter_for_review: filterForReview,
         filter_vendor: filterVendor,
         filter_bidding: filterBidding,
-        filter_gb_focus: filterGbFocus
+        filter_gb_focus: filterGbFocus,
+        filter_post_grade: filterPostGrade
       }),
     });
 
