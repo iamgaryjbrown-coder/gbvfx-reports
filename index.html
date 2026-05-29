@@ -377,7 +377,7 @@ async function generateReport() {
   // For Review always includes Vers With Edit
   if (filterForReview) showVers = true;
   var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  var reportType = filterBidding ? "Bidding" : (filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (showCost ? "Cost" : "Status")));
+  var reportType = filterBidding ? "Bidding" : (filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (filterPostGrade ? "Post_Grade" : (showCost ? "Cost" : "Status"))));
   var filename = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
 
   // Ask for save location FIRST while we still have user-gesture context.
@@ -440,7 +440,7 @@ async function generateReport() {
       show_invoiced: showInvoiced,
       show_prod: showProd,
       skip_summary: filterBidding,
-      report_title: filterBidding ? "SHOTS IN BIDDING" : (filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : null)),
+      report_title: filterBidding ? "SHOTS IN BIDDING" : (filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : (filterPostGrade ? "SHOTS FOR POST-GRADE" : null))),
       filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
