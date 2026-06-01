@@ -986,7 +986,6 @@ function render() {
         <span class="arrow ${isOpen ? 'open' : ''}">&#9654;</span>
         <span class="show-name">${esc(data.name)}</span>
         <span class="status-pill ${pillClass}" id="pill-${code}">${status}</span>
-        <span class="show-code">${data.sgId ? 'SG ' + data.sgId + ' • ' : ''}${code}</span>
       </div>
       <div class="project-body ${isOpen ? 'open' : ''}">${html}</div>
     `;
