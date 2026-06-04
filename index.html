@@ -221,7 +221,7 @@ async function loadProjects() {
   var sel = document.getElementById("projectSelect");
   var html = '<option value="">Select project...</option>';
   PROJECTS.forEach(function(p) {
-    html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '">' + p.name + ' (' + p.code + ')</option>';
+    html += '<option value="' + p.id + '" data-code="' + p.code + '" data-client="' + (p.client || '') + '" data-contact="' + (p.contact || '') + '" data-project-type="' + (p.project_type || '') + '">' + p.name + ' (' + p.code + ')</option>';
   });
   sel.innerHTML = html;
 }
@@ -281,6 +281,22 @@ async function onProjectChange() {
     document.getElementById("clientInput").value = opt.dataset.client || "";
     document.getElementById("contactInput").value = opt.dataset.contact || "";
   }
+
+  // Feature reports are flat (no episode scaffolding): hide both episode-row
+  // blocks, skip the episodes fetch, and self-enable the generate button
+  // (renderEpisodes() normally enables it — the feature path bypasses that).
+  var isFeature = ((opt.dataset.projectType || "").toLowerCase().indexOf("feature") !== -1);
+  var sumField = document.getElementById("episodeGrid").closest(".field");
+  var shotField = document.getElementById("shotEpisodeGrid").closest(".field");
+  if (isFeature) {
+    if (sumField) sumField.style.display = "none";
+    if (shotField) shotField.style.display = "none";
+    EPISODES = [];
+    document.getElementById("generateBtn").disabled = false;
+    return;
+  }
+  if (sumField) sumField.style.display = "";
+  if (shotField) shotField.style.display = "";
 
   try {
     var data = await apiFetch("/api/reports/episodes?project_id=" + pid);
@@ -358,8 +374,10 @@ async function generateReport() {
   var projectId = parseInt(sel.value);
   var projectCode = sel.options[sel.selectedIndex].dataset.code;
   var projectName = sel.options[sel.selectedIndex].text;
-  var summaryEpisodes = getSelectedEpisodes("ep");
-  var shotEpisodes = getSelectedEpisodes("shotEp");
+  var genOpt = sel.options[sel.selectedIndex];
+  var isFeatureGen = ((genOpt.dataset.projectType || "").toLowerCase().indexOf("feature") !== -1);
+  var summaryEpisodes = isFeatureGen ? ["all"] : getSelectedEpisodes("ep");
+  var shotEpisodes = isFeatureGen ? ["all"] : getSelectedEpisodes("shotEp");
 
   var showCost = document.getElementById("colCost").checked;
   var showNotes = document.getElementById("colNotes").checked;
