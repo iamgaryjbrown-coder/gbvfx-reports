@@ -360,7 +360,8 @@ function defaultQcConfig() {
       source_layout: 'date_then_pkg',
       delivery_qt_folder: 'DEL/QT',
       delivery_exr_folder: 'DEL/EXR',
-      dropbox_project_folder: ''
+      dropbox_project_folder: '',
+      prores_folder: ''
     },
     shot_code: {
       pattern: '',
@@ -693,6 +694,8 @@ function qcConfigBody(code, data) {
             'date_then_pkg = <date>/<shot>_pkg/<shot>/<WxH>/ (BLM). pkg_per_folder = <pkg>/<shot>/... (TREA).')
     + qcRow('Delivery QT folder', qcStrInput(code, 'paths.delivery_qt_folder'))
     + qcRow('Delivery EXR folder', qcStrInput(code, 'paths.delivery_exr_folder'))
+    + qcRow('ProRes folder', qcStrInput(code, 'paths.prores_folder', { placeholder: 'DEL/PRORES' }),
+            'Optional - flat folder of {shot}_{version}.mov; enables Rec.709 ProRes fallback when the EXR is absent')
     + qcRow('Dropbox project folder', qcStrInput(code, 'paths.dropbox_project_folder', { placeholder: 'Bloomers' }),
             'Folder name under ~/Dropbox/GBVFX/Projects/'));
 
