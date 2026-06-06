@@ -119,6 +119,21 @@
   .add-row button { background: rgba(46,204,113,0.08); border: 1px dashed rgba(46,204,113,0.25); color: #2ecc71; padding: 6px 14px; border-radius: 6px; font-size: 11px; cursor: pointer; font-family: inherit; }
   .add-row button:hover { background: rgba(46,204,113,0.15); border-style: solid; }
 
+  /* Delivery recipient matrix — QT / EXR axis, each To / Cc / None per contact */
+  .recipient-matrix { margin-top: 6px; overflow-x: auto; }
+  .rm-grid { display: grid; grid-template-columns: minmax(150px, 1.6fr) max-content max-content; gap: 7px 22px; align-items: center; min-width: 460px; }
+  .rm-head { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #7a8a99; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .rm-head.qt { color: #f39c12; }
+  .rm-head.exr { color: #2ecc71; }
+  .rm-label { font-size: 11px; color: #c8d6e5; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rm-label .rm-role { color: #7a8a99; }
+  .rm-axis { display: flex; gap: 12px; }
+  .rm-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #7a8a99; cursor: pointer; }
+  .rm-opt input[type=radio] { width: 13px; height: 13px; cursor: pointer; margin: 0; }
+  .rm-opt input[type=radio].qt { accent-color: #f39c12; }
+  .rm-opt input[type=radio].exr { accent-color: #2ecc71; }
+  .rm-empty { font-size: 11px; color: #7a8a99; font-style: italic; padding: 6px 0; }
+
   /* Responsive */
   @media (max-width: 700px) {
     .col-headers { grid-template-columns: 100px 1fr 1fr; }
@@ -426,14 +441,14 @@ function normalise(p) {
     post_house: p.post_house || '',
     sg_forms_contact: p.sg_forms_contact || '',
     contacts: Array.isArray(p.contacts) ? p.contacts : [
-      { role: 'Producer', name: '', email: '', phone: '' },
-      { role: 'PPS', name: '', email: '', phone: '' },
-      { role: 'Post Prod Coordinator', name: '', email: '', phone: '' },
-      { role: '1st Assist Editor', name: '', email: '', phone: '' }
+      { role: 'Producer', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
+      { role: 'PPS', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
+      { role: 'Post Prod Coordinator', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
+      { role: '1st Assist Editor', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' }
     ],
     post_contacts: Array.isArray(p.post_contacts) ? p.post_contacts : [
-      { role: 'Post Producer', name: '', email: '', phone: '' },
-      { role: 'Post Contact', name: '', email: '', phone: '' }
+      { role: 'Post Producer', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
+      { role: 'Post Contact', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' }
     ],
     workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {}),
     qc_config: mergeQcConfig(p.qc_config)
@@ -895,6 +910,9 @@ function render() {
       <button onclick="addContact('${code}', 'post_contacts')">+ Add post house contact</button>
     </div>`;
 
+    // ── Delivery recipients (QT / EXR → To / Cc / None per contact) ──
+    html += recipientMatrix(code, data);
+
     // ── Workflow docs ──
     const pickedList = (pickedFiles[code] || []).map((f, idx) =>
       `<span class="file-chip">${esc(f.name)} <span class="x" onclick="event.stopPropagation(); removePickedFile('${code}', ${idx})">&times;</span></span>`
@@ -1010,6 +1028,47 @@ function contactRow(code, group, index, c) {
     <input type="text" data-code="${code}" data-path="${group}.${index}.email" value="${esc(c.email)}" placeholder="email@...">
     <input type="text" data-code="${code}" data-path="${group}.${index}.phone" value="${esc(c.phone)}" placeholder="Phone">
   </div>`;
+}
+
+// One axis (qt / exr) of To / Cc / None radios for a single contact.
+// Three radios share data-path "<group>.<idx>.<axis>_role"; collectInputs'
+// radio guard writes only the checked member.
+function rmAxis(code, group, idx, axis, val) {
+  const field = axis + '_role';
+  const name = `${code}-${group}-${idx}-${axis}`;
+  return [['to', 'To'], ['cc', 'Cc'], ['none', 'None']].map(([v, lbl]) => {
+    const checked = val === v ? 'checked' : '';
+    return `<label class="rm-opt"><input type="radio" class="${axis}" name="${esc(name)}" value="${v}" data-code="${code}" data-path="${group}.${idx}.${field}" ${checked}>${lbl}</label>`;
+  }).join('');
+}
+
+// Delivery-recipient matrix: contacts as rows, QT + EXR axes, each To/Cc/None.
+// Spans production + post-house contacts. Missing roles default to 'none' at
+// render; the checked 'none' radio stamps the value explicitly on next save.
+function recipientMatrix(code, data) {
+  let rows = '';
+  [['contacts', data.contacts || []], ['post_contacts', data.post_contacts || []]].forEach(([group, list]) => {
+    list.forEach((c, idx) => {
+      if (!(c.role || c.name)) return;  // skip blank skeleton rows
+      const qt = c.qt_role || 'none';
+      const exr = c.exr_role || 'none';
+      const label = c.name && c.role
+        ? esc(c.name) + ' <span class="rm-role">— ' + esc(c.role) + '</span>'
+        : esc(c.name || c.role);
+      rows += `<div class="rm-label">${label}</div>
+        <div class="rm-axis">${rmAxis(code, group, idx, 'qt', qt)}</div>
+        <div class="rm-axis">${rmAxis(code, group, idx, 'exr', exr)}</div>`;
+    });
+  });
+  if (!rows) {
+    return `<div class="section-label">Delivery Recipients</div>
+      <div class="rm-empty">Add contacts above to assign QT / EXR delivery recipients.</div>`;
+  }
+  return `<div class="section-label">Delivery Recipients</div>
+    <div class="recipient-matrix"><div class="rm-grid">
+      <div></div><div class="rm-head qt">QT delivery</div><div class="rm-head exr">EXR delivery</div>
+      ${rows}
+    </div></div>`;
 }
 
 function _findUnresolved(code, id) {
@@ -1179,7 +1238,7 @@ function updateStatusPill(code, newStatus) {
 
 function addContact(code, group) {
   collectInputs();
-  saved[code][group].push({ role: '', name: '', email: '', phone: '' });
+  saved[code][group].push({ role: '', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' });
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
   openProjects.add(code);
   render();
@@ -1199,6 +1258,7 @@ function addProject() {
 
 function collectInputs() {
   document.querySelectorAll('select[data-code], input[data-code]').forEach(el => {
+    if (el.type === 'radio' && !el.checked) return;  // radio groups: only the checked member carries the value
     const code = el.dataset.code;
     const path = el.dataset.path;
     if (!path || !saved[code]) return;
@@ -1488,7 +1548,9 @@ function approveModal() {
         role: c.role || 'Post Contact',
         name: c.name || '',
         email: c.email || '',
-        phone: c.phone || ''
+        phone: c.phone || '',
+        qt_role: 'none',
+        exr_role: 'none'
       });
       if (email) existingEmails.add(email);
       added++;
