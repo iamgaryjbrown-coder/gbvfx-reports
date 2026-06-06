@@ -133,6 +133,7 @@
   .rm-opt input[type=radio].qt { accent-color: #f39c12; }
   .rm-opt input[type=radio].exr { accent-color: #2ecc71; }
   .rm-empty { font-size: 11px; color: #7a8a99; font-style: italic; padding: 6px 0; }
+  .rm-bcc { font-size: 10px; color: #7a8a99; font-style: italic; margin-top: 8px; }
 
   /* Responsive */
   @media (max-width: 700px) {
@@ -1042,6 +1043,12 @@ function rmAxis(code, group, idx, axis, val) {
   }).join('');
 }
 
+// Two addresses always BCC'd on every delivery email, independent of the
+// To/Cc matrix selections. Single source of truth for the documentation
+// footnote below; the phase-2 send-time resolver (#93) should mirror these
+// exact values so the footnote and the actual BCC list can't drift.
+const ALWAYS_BCC = ['gary@gbvfx.com', 'spud.gbvfx@outlook.com'];
+
 // Delivery-recipient matrix: contacts as rows, QT + EXR axes, each To/Cc/None.
 // Spans production + post-house contacts. Missing roles default to 'none' at
 // render; the checked 'none' radio stamps the value explicitly on next save.
@@ -1068,7 +1075,8 @@ function recipientMatrix(code, data) {
     <div class="recipient-matrix"><div class="rm-grid">
       <div></div><div class="rm-head qt">QT delivery</div><div class="rm-head exr">EXR delivery</div>
       ${rows}
-    </div></div>`;
+    </div>
+    <div class="rm-bcc">Always BCC: ${esc(ALWAYS_BCC.join(', '))}</div></div>`;
 }
 
 function _findUnresolved(code, id) {
