@@ -377,7 +377,8 @@ function defaultQcConfig() {
       delivery_qt_folder: 'DEL/QT',
       delivery_exr_folder: 'DEL/EXR',
       dropbox_project_folder: '',
-      prores_folder: ''
+      prores_folder: '',
+      exr_finals_folder: ''
     },
     shot_code: {
       pattern: '',
@@ -712,6 +713,8 @@ function qcConfigBody(code, data) {
     + qcRow('Delivery EXR folder', qcStrInput(code, 'paths.delivery_exr_folder'))
     + qcRow('ProRes folder', qcStrInput(code, 'paths.prores_folder', { placeholder: 'DEL/PRORES' }),
             'Optional - flat folder of {shot}_{version}.mov; enables Rec.709 ProRes fallback when the EXR is absent')
+    + qcRow('EXR finals folder', qcStrInput(code, 'paths.exr_finals_folder', { placeholder: 'DEL/GARY_EXRS' }),
+            'Optional - flat folder of {shot}_{version}/ EXR finals (e.g. GaryEXRs); searched as EXR before the ProRes fallback')
     + qcRow('Dropbox project folder', qcStrInput(code, 'paths.dropbox_project_folder', { placeholder: 'Bloomers' }),
             'Folder name under ~/Dropbox/GBVFX/Projects/'));
 
