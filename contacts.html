@@ -134,6 +134,13 @@
   .rm-opt input[type=radio].exr { accent-color: #2ecc71; }
   .rm-empty { font-size: 11px; color: #7a8a99; font-style: italic; padding: 6px 0; }
   .rm-bcc { font-size: 10px; color: #7a8a99; font-style: italic; margin-top: 8px; }
+  .rm-bcc code { font-style: normal; color: #c8d6e5; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
+
+  /* Delivery message bodies (QT + EXR) */
+  .delivery-body-grid { display: grid; grid-template-columns: 130px 1fr; gap: 8px 12px; align-items: start; }
+  .delivery-body-ta { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; color: #fff; font-family: inherit; font-size: 12px; line-height: 1.5; outline: none; min-height: 54px; resize: vertical; }
+  .delivery-body-ta:focus { border-color: #f39c12; background: rgba(255,255,255,0.06); }
+  .delivery-body-ta::placeholder { color: #3a4556; font-style: italic; }
 
   /* Responsive */
   @media (max-width: 700px) {
@@ -442,6 +449,8 @@ function normalise(p) {
     production_company: p.production_company || '',
     post_house: p.post_house || '',
     sg_forms_contact: p.sg_forms_contact || '',
+    delivery_body_qt: p.delivery_body_qt || '',
+    delivery_body_exr: p.delivery_body_exr || '',
     contacts: Array.isArray(p.contacts) ? p.contacts : [
       { role: 'Producer', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
       { role: 'PPS', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
@@ -917,6 +926,16 @@ function render() {
     // ── Delivery recipients (QT / EXR → To / Cc / None per contact) ──
     html += recipientMatrix(code, data);
 
+    // ── Delivery message bodies (QT + EXR) — Brain-sourced (#133), ships dark ──
+    html += `<div class="section-label">Delivery Message</div>
+      <div class="rm-bcc" style="margin-bottom:8px;">Blank = use the standard template (config fallback). Only <code>{download_expiry_days}</code> is substituted; anything else in braces prints literally.</div>
+      <div class="delivery-body-grid">
+        <div class="role" style="padding-top:8px;">QT delivery body</div>
+        <textarea data-code="${code}" data-path="delivery_body_qt" placeholder="Blank = standard QT template" class="delivery-body-ta">${esc(data.delivery_body_qt || '')}</textarea>
+        <div class="role" style="padding-top:8px;">EXR delivery body</div>
+        <textarea data-code="${code}" data-path="delivery_body_exr" placeholder="Blank = standard EXR template" class="delivery-body-ta">${esc(data.delivery_body_exr || '')}</textarea>
+      </div>`;
+
     // ── Workflow docs ──
     const pickedList = (pickedFiles[code] || []).map((f, idx) =>
       `<span class="file-chip">${esc(f.name)} <span class="x" onclick="event.stopPropagation(); removePickedFile('${code}', ${idx})">&times;</span></span>`
@@ -1268,7 +1287,7 @@ function addProject() {
 }
 
 function collectInputs() {
-  document.querySelectorAll('select[data-code], input[data-code]').forEach(el => {
+  document.querySelectorAll('select[data-code], input[data-code], textarea[data-code]').forEach(el => {
     if (el.type === 'radio' && !el.checked) return;  // radio groups: only the checked member carries the value
     const code = el.dataset.code;
     const path = el.dataset.path;
