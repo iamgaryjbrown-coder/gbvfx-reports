@@ -416,8 +416,9 @@ function defaultQcConfig() {
     // v2 EXR-format conformance (engine-read when exr.enforce=true). Each comparable
     // field is an explicit literal OR 'preserve' (== matched source). pixel_aspect is
     // 'preserve' everywhere (no editable field — nothing GBVFX delivers changes PAR).
-    // channels.alpha policy: 'flag' (flag-if-present, PASS+surface — needs warn-tier) or
-    // 'ignore'. forbidden/required not offered (no project needs them).
+    // channels = the required-presence set only. Alpha / extra-matte channels are
+    // handled UNIVERSALLY by the engine (flag-if-present: PASS but surfaced, never
+    // fail) — not a per-project field, so no alpha selector here.
     exr: {
       enforce: false,
       compression: 'preserve',
@@ -425,7 +426,7 @@ function defaultQcConfig() {
       pixel_aspect: 'preserve',
       line_order: 'preserve',
       storage: 'preserve',
-      channels: { required: ['R', 'G', 'B'], alpha: 'ignore' },
+      channels: { required: ['R', 'G', 'B'] },
       require_datawindow_eq_displaywindow: false
     },
     // colour.mode: 'off' (inert) or 'chromaticities_preserved' (== matched source)
@@ -681,9 +682,8 @@ function validateQcConfig() {
             if (!Array.isArray(ch.required) || ch.required.length === 0) {
               errs.push(tag + ' exr.channels.required must be a non-empty list');
             }
-            if (ch.alpha !== 'flag' && ch.alpha !== 'ignore') {
-              errs.push(tag + " exr.channels.alpha must be 'flag' or 'ignore'");
-            }
+            // No alpha-policy field — alpha/extra-matte channels are flagged
+            // universally by the engine (never failed), nothing to validate.
           }
         }
       } else if (exr.enforce != null && typeof exr.enforce !== 'boolean') {
@@ -910,9 +910,7 @@ function qcConfigBody(code, data) {
        + qcRow('Line order', qcSelectInput(code, 'exr.line_order', ['preserve', 'increasing_y', 'decreasing_y']))
        + qcRow('Storage', qcSelectInput(code, 'exr.storage', ['preserve', 'scanline', 'tiled']))
        + qcRow('Channels — required', qcStrListInput(code, 'exr.channels.required', { placeholder: 'R, G, B' }),
-               'Comma-separated channel names that must be present.')
-       + qcRow('Channels — alpha policy', qcSelectInput(code, 'exr.channels.alpha', ['flag', 'ignore']),
-               "flag = an alpha that appears PASSes but is surfaced for review (needs the warn-tier engine addition; until then it silently passes). ignore = don't check alpha.")
+               'Comma-separated channel names that must be present (missing = FAIL). Alpha / extra-matte channels that appear are flagged for review, never failed — handled universally by the engine, no setting here.')
        + qcRow('dataWindow == displayWindow', qcBoolInput(code, 'exr.require_datawindow_eq_displaywindow'),
                'Self-consistency check (no source comparison).')
        + '</div></div>';
