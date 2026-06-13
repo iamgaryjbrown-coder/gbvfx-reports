@@ -402,20 +402,39 @@ function defaultQcConfig() {
       expected_count_rule: 'source_equals',
       handles: { head: null, tail: null }
     },
-    resolution: { expected: [], enforce: true },
+    // mode: 'explicit' (compare against expected list) or 'preserve' (== matched source)
+    resolution: { expected: [], enforce: false, mode: 'explicit' },
     slate: {
       enabled: false,
       expected_show: '',
       expected_vendor: '',
       expected_status: ''
     },
-    timecode: { enforce: false, expected_start: '' },
+    // mode: 'preserve_source' (== matched source TC) or 'fixed_start' (== start, a Brain
+    // value, e.g. TREA 00:00:41:17). expected_start retired — start carries the target.
+    timecode: { enforce: false, mode: 'preserve_source', start: '' },
+    // v2 EXR-format conformance (engine-read when exr.enforce=true). Each comparable
+    // field is an explicit literal OR 'preserve' (== matched source). pixel_aspect is
+    // 'preserve' everywhere (no editable field — nothing GBVFX delivers changes PAR).
+    // channels.alpha policy: 'flag' (flag-if-present, PASS+surface — needs warn-tier) or
+    // 'ignore'. forbidden/required not offered (no project needs them).
+    exr: {
+      enforce: false,
+      compression: 'preserve',
+      pixel_type: 'preserve',
+      pixel_aspect: 'preserve',
+      line_order: 'preserve',
+      storage: 'preserve',
+      channels: { required: ['R', 'G', 'B'], alpha: 'ignore' },
+      require_datawindow_eq_displaywindow: false
+    },
+    // colour.mode: 'off' (inert) or 'chromaticities_preserved' (== matched source)
+    colour: { mode: 'off' },
     diff_qc: { enabled: false, gain: 10, skip_slate_frame: false },
     resolve: { bin_name: '' },
     // Reserved — engine ignores in Phase 1
     editorial_qt_spec: { codec: '', bit_depth: null, width: null, height: null },
     show_lut: { primary: '', per_shot_lut: false },
-    exr: { expected_compression: '', expected_bit_depth: null, expected_colour_space: '', expected_extension: '.exr' },
     frame_contiguity: { enforce: false }
   };
 }
@@ -607,16 +626,77 @@ function validateQcConfig() {
     if (rule !== 'source_plus_one' && rule !== 'source_equals') {
       errs.push(tag + ' frames.expected_count_rule must be source_plus_one or source_equals');
     }
+    // Resolution: mode-aware (mirrors backend _check_resolution).
     reqBool('resolution.enforce');
+    const resMode = _getDeep(cfg, 'resolution.mode');
+    if (_getDeep(cfg, 'resolution.enforce') === true) {
+      if (resMode !== 'explicit' && resMode !== 'preserve') {
+        errs.push(tag + " resolution.mode must be 'explicit' or 'preserve' when resolution.enforce=true");
+      } else if (resMode === 'explicit') {
+        const exp = _getDeep(cfg, 'resolution.expected');
+        if (!Array.isArray(exp) || exp.length === 0) {
+          errs.push(tag + " resolution.expected required (non-empty) when enforce=true and mode='explicit'");
+        }
+      }
+    } else if (resMode != null && resMode !== 'explicit' && resMode !== 'preserve') {
+      errs.push(tag + " resolution.mode must be 'explicit' or 'preserve'");
+    }
     reqBool('slate.enabled');
     if (_getDeep(cfg, 'slate.enabled') === true) {
       reqStr('slate.expected_show');
       reqStr('slate.expected_vendor');
       reqStr('slate.expected_status');
     }
+    // Timecode: mode-aware (mirrors backend _check_timecode). expected_start retired.
     reqBool('timecode.enforce');
     if (_getDeep(cfg, 'timecode.enforce') === true) {
-      reqStr('timecode.expected_start');
+      const tcMode = _getDeep(cfg, 'timecode.mode');
+      if (tcMode !== 'preserve_source' && tcMode !== 'fixed_start') {
+        errs.push(tag + " timecode.mode must be 'preserve_source' or 'fixed_start' when timecode.enforce=true");
+      } else if (tcMode === 'fixed_start') {
+        const start = _getDeep(cfg, 'timecode.start');
+        if (typeof start !== 'string' || start.trim() === '') {
+          errs.push(tag + " timecode.start required (HH:MM:SS:FF) when timecode.mode='fixed_start'");
+        } else if (!/^\d{2}[:;]\d{2}[:;]\d{2}[:;]\d{2}$/.test(start.trim())) {
+          errs.push(tag + ' timecode.start malformed — want HH:MM:SS:FF');
+        }
+      }
+    }
+    // EXR format: validated only when exr.enforce=true (mirrors backend _check_exr).
+    const exr = cfg.exr;
+    if (exr && typeof exr === 'object') {
+      if (exr.enforce === true) {
+        ['compression', 'pixel_type', 'pixel_aspect', 'line_order', 'storage'].forEach(k => {
+          if (exr[k] == null || exr[k] === '') {
+            errs.push(tag + ' exr.' + k + ' required (literal or "preserve") when exr.enforce=true');
+          }
+        });
+        const ch = exr.channels;
+        if (ch == null) {
+          errs.push(tag + ' exr.channels required when exr.enforce=true');
+        } else if (ch !== 'preserve') {
+          if (typeof ch !== 'object') {
+            errs.push(tag + ' exr.channels must be an object or "preserve"');
+          } else {
+            if (!Array.isArray(ch.required) || ch.required.length === 0) {
+              errs.push(tag + ' exr.channels.required must be a non-empty list');
+            }
+            if (ch.alpha !== 'flag' && ch.alpha !== 'ignore') {
+              errs.push(tag + " exr.channels.alpha must be 'flag' or 'ignore'");
+            }
+          }
+        }
+      } else if (exr.enforce != null && typeof exr.enforce !== 'boolean') {
+        errs.push(tag + ' exr.enforce must be bool');
+      }
+    }
+    // Colour: optional; mode 'off' (or absent) is inert (mirrors backend _check_colour).
+    const colour = cfg.colour;
+    if (colour && typeof colour === 'object') {
+      const cm = colour.mode == null ? 'off' : colour.mode;
+      if (cm !== 'chromaticities_preserved' && cm !== 'off') {
+        errs.push(tag + " colour.mode must be 'chromaticities_preserved' or 'off'");
+      }
     }
     reqBool('diff_qc.enabled');
     if (_getDeep(cfg, 'diff_qc.enabled') === true) {
@@ -694,6 +774,7 @@ function qcConfigBody(code, data) {
   const cfg = data.qc_config || defaultQcConfig();
   const slateEnabled = _getDeep(cfg, 'slate.enabled') === true;
   const tcEnabled = _getDeep(cfg, 'timecode.enforce') === true;
+  const exrEnabled = _getDeep(cfg, 'exr.enforce') === true;
   const diffEnabled = _getDeep(cfg, 'diff_qc.enabled') === true;
   const hasResSub = _getDeep(cfg, 'ab_inner_layout.has_resolution_subfolder') === true;
 
@@ -764,9 +845,11 @@ function qcConfigBody(code, data) {
   html += qcSectionBlock('Resolution',
     qcRow('Enforce resolution check', qcBoolInput(code, 'resolution.enforce'),
           'false = log mismatch but do not fail (TREA dual-format).')
-    + qcRow('Expected resolutions (comma-separated, optional)', qcStrListInput(code, 'resolution.expected',
+    + qcRow('Mode', qcSelectInput(code, 'resolution.mode', ['explicit', 'preserve']),
+            'explicit = must match one of the Expected list. preserve = must equal the matched source resolution (TREA dual-format). Required when enforce=true.')
+    + qcRow('Expected resolutions (comma-separated)', qcStrListInput(code, 'resolution.expected',
             { placeholder: '4608x3164, 4608x2094' }),
-            'Empty = derive from source folder name (BLM). List = enforce one of these.'));
+            'Used only when mode=explicit (then required, non-empty). Ignored when mode=preserve.'));
 
   // Slate (gated)
   html += '<div class="qc-block"><h4>Slate OCR</h4>'
@@ -779,9 +862,12 @@ function qcConfigBody(code, data) {
 
   // Timecode (gated)
   html += '<div class="qc-block"><h4>Timecode</h4>'
-       + qcEnableToggle(code, 'timecode.enforce', 'Enforce timecode start')
+       + qcEnableToggle(code, 'timecode.enforce', 'Enforce timecode')
        + '<div class="qc-grid' + (tcEnabled ? '' : ' qc-disabled') + '">'
-       + qcRow('Expected TC start', qcStrInput(code, 'timecode.expected_start', { placeholder: '0:0:41:16' }))
+       + qcRow('Mode', qcSelectInput(code, 'timecode.mode', ['preserve_source', 'fixed_start']),
+               'preserve_source = return TC must equal the matched source TC (CAPA, "As source TC"). fixed_start = return TC must equal the Start value below (TREA).')
+       + qcRow('Fixed start TC', qcStrInput(code, 'timecode.start', { placeholder: '00:00:41:17' }),
+               'HH:MM:SS:FF. Required when mode=fixed_start. The target start TC — e.g. TREA 00:00:41:17. Ignored when mode=preserve_source.')
        + '</div></div>';
 
   // Diff QC (gated)
@@ -811,12 +897,30 @@ function qcConfigBody(code, data) {
             'true = each shot ships its own LUT (TOM/Company-3 pattern).'),
     { reserved: true });
 
-  html += qcSectionBlock('EXR metadata',
-    qcRow('Compression', qcSelectInput(code, 'exr.expected_compression', ['', 'piz', 'zip', 'zips', 'none']))
-    + qcRow('Bit depth', qcIntInput(code, 'exr.expected_bit_depth', { placeholder: '16' }))
-    + qcRow('Colour space', qcStrInput(code, 'exr.expected_colour_space', { placeholder: 'ACES 2065-1 AP0 linear' }))
-    + qcRow('Extension', qcStrInput(code, 'exr.expected_extension', { placeholder: '.exr' })),
-    { reserved: true });
+  // EXR format conformance (gated by exr.enforce). Each field = an explicit
+  // literal OR 'preserve' (== matched source). pixel_aspect is preserve
+  // everywhere — deliberately no field (nothing GBVFX delivers changes PAR).
+  html += '<div class="qc-block"><h4>EXR format</h4>'
+       + qcEnableToggle(code, 'exr.enforce', 'Enforce EXR format checks')
+       + '<div class="qc-grid' + (exrEnabled ? '' : ' qc-disabled') + '">'
+       + qcRow('Compression', qcSelectInput(code, 'exr.compression',
+               ['preserve', 'piz', 'zip', 'zips', 'none', 'rle', 'pxr24', 'b44', 'b44a', 'dwaa', 'dwab']),
+               "Explicit literal, or 'preserve' (== matched source).")
+       + qcRow('Pixel type', qcSelectInput(code, 'exr.pixel_type', ['preserve', 'half', 'float', 'uint']))
+       + qcRow('Line order', qcSelectInput(code, 'exr.line_order', ['preserve', 'increasing_y', 'decreasing_y']))
+       + qcRow('Storage', qcSelectInput(code, 'exr.storage', ['preserve', 'scanline', 'tiled']))
+       + qcRow('Channels — required', qcStrListInput(code, 'exr.channels.required', { placeholder: 'R, G, B' }),
+               'Comma-separated channel names that must be present.')
+       + qcRow('Channels — alpha policy', qcSelectInput(code, 'exr.channels.alpha', ['flag', 'ignore']),
+               "flag = an alpha that appears PASSes but is surfaced for review (needs the warn-tier engine addition; until then it silently passes). ignore = don't check alpha.")
+       + qcRow('dataWindow == displayWindow', qcBoolInput(code, 'exr.require_datawindow_eq_displaywindow'),
+               'Self-consistency check (no source comparison).')
+       + '</div></div>';
+
+  // Colour (chromaticities)
+  html += qcSectionBlock('Colour',
+    qcRow('Mode', qcSelectInput(code, 'colour.mode', ['off', 'chromaticities_preserved']),
+          "off = no check. chromaticities_preserved = return chromaticities must equal the matched source's."));
 
   html += qcSectionBlock('Frame contiguity',
     qcRow('Enforce contiguity', qcBoolInput(code, 'frame_contiguity.enforce'),
