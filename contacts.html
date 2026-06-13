@@ -627,20 +627,27 @@ function validateQcConfig() {
     if (rule !== 'source_plus_one' && rule !== 'source_equals') {
       errs.push(tag + ' frames.expected_count_rule must be source_plus_one or source_equals');
     }
-    // Resolution: mode-aware (mirrors backend _check_resolution).
+    // The v2-strict schema (mode-aware resolution/timecode + exr + colour) only
+    // applies to v2-engine projects. v1/legacy (engine_version absent or "v1",
+    // e.g. BLM/CAPA) validate under the original rules. Mirrors backend
+    // validate_block's is_v2 branching (regression fix 2026-06-13).
+    const isV2 = (_getDeep(cfg, 'engine_version') === 'v2');
+    // Resolution
     reqBool('resolution.enforce');
-    const resMode = _getDeep(cfg, 'resolution.mode');
-    if (_getDeep(cfg, 'resolution.enforce') === true) {
-      if (resMode !== 'explicit' && resMode !== 'preserve') {
-        errs.push(tag + " resolution.mode must be 'explicit' or 'preserve' when resolution.enforce=true");
-      } else if (resMode === 'explicit') {
-        const exp = _getDeep(cfg, 'resolution.expected');
-        if (!Array.isArray(exp) || exp.length === 0) {
-          errs.push(tag + " resolution.expected required (non-empty) when enforce=true and mode='explicit'");
+    if (isV2) {
+      const resMode = _getDeep(cfg, 'resolution.mode');
+      if (_getDeep(cfg, 'resolution.enforce') === true) {
+        if (resMode !== 'explicit' && resMode !== 'preserve') {
+          errs.push(tag + " resolution.mode must be 'explicit' or 'preserve' when resolution.enforce=true");
+        } else if (resMode === 'explicit') {
+          const exp = _getDeep(cfg, 'resolution.expected');
+          if (!Array.isArray(exp) || exp.length === 0) {
+            errs.push(tag + " resolution.expected required (non-empty) when enforce=true and mode='explicit'");
+          }
         }
+      } else if (resMode != null && resMode !== 'explicit' && resMode !== 'preserve') {
+        errs.push(tag + " resolution.mode must be 'explicit' or 'preserve'");
       }
-    } else if (resMode != null && resMode !== 'explicit' && resMode !== 'preserve') {
-      errs.push(tag + " resolution.mode must be 'explicit' or 'preserve'");
     }
     reqBool('slate.enabled');
     if (_getDeep(cfg, 'slate.enabled') === true) {
@@ -648,54 +655,59 @@ function validateQcConfig() {
       reqStr('slate.expected_vendor');
       reqStr('slate.expected_status');
     }
-    // Timecode: mode-aware (mirrors backend _check_timecode). expected_start retired.
+    // Timecode
     reqBool('timecode.enforce');
     if (_getDeep(cfg, 'timecode.enforce') === true) {
-      const tcMode = _getDeep(cfg, 'timecode.mode');
-      if (tcMode !== 'preserve_source' && tcMode !== 'fixed_start') {
-        errs.push(tag + " timecode.mode must be 'preserve_source' or 'fixed_start' when timecode.enforce=true");
-      } else if (tcMode === 'fixed_start') {
-        const start = _getDeep(cfg, 'timecode.start');
-        if (typeof start !== 'string' || start.trim() === '') {
-          errs.push(tag + " timecode.start required (HH:MM:SS:FF) when timecode.mode='fixed_start'");
-        } else if (!/^\d{2}[:;]\d{2}[:;]\d{2}[:;]\d{2}$/.test(start.trim())) {
-          errs.push(tag + ' timecode.start malformed — want HH:MM:SS:FF');
+      if (!isV2) {
+        // v1/legacy: enforce=true requires expected_start.
+        reqStr('timecode.expected_start');
+      } else {
+        const tcMode = _getDeep(cfg, 'timecode.mode');
+        if (tcMode !== 'preserve_source' && tcMode !== 'fixed_start') {
+          errs.push(tag + " timecode.mode must be 'preserve_source' or 'fixed_start' when timecode.enforce=true");
+        } else if (tcMode === 'fixed_start') {
+          const start = _getDeep(cfg, 'timecode.start');
+          if (typeof start !== 'string' || start.trim() === '') {
+            errs.push(tag + " timecode.start required (HH:MM:SS:FF) when timecode.mode='fixed_start'");
+          } else if (!/^\d{2}[:;]\d{2}[:;]\d{2}[:;]\d{2}$/.test(start.trim())) {
+            errs.push(tag + ' timecode.start malformed — want HH:MM:SS:FF');
+          }
         }
       }
     }
-    // EXR format: validated only when exr.enforce=true (mirrors backend _check_exr).
-    const exr = cfg.exr;
-    if (exr && typeof exr === 'object') {
-      if (exr.enforce === true) {
-        ['compression', 'pixel_type', 'pixel_aspect', 'line_order', 'storage'].forEach(k => {
-          if (exr[k] == null || exr[k] === '') {
-            errs.push(tag + ' exr.' + k + ' required (literal or "preserve") when exr.enforce=true');
-          }
-        });
-        const ch = exr.channels;
-        if (ch == null) {
-          errs.push(tag + ' exr.channels required when exr.enforce=true');
-        } else if (ch !== 'preserve') {
-          if (typeof ch !== 'object') {
-            errs.push(tag + ' exr.channels must be an object or "preserve"');
-          } else {
-            if (!Array.isArray(ch.required) || ch.required.length === 0) {
-              errs.push(tag + ' exr.channels.required must be a non-empty list');
+    // EXR format + Colour: v2-engine projects only (mirrors backend gating).
+    if (isV2) {
+      const exr = cfg.exr;
+      if (exr && typeof exr === 'object') {
+        if (exr.enforce === true) {
+          ['compression', 'pixel_type', 'pixel_aspect', 'line_order', 'storage'].forEach(k => {
+            if (exr[k] == null || exr[k] === '') {
+              errs.push(tag + ' exr.' + k + ' required (literal or "preserve") when exr.enforce=true');
             }
-            // No alpha-policy field — alpha/extra-matte channels are flagged
-            // universally by the engine (never failed), nothing to validate.
+          });
+          const ch = exr.channels;
+          if (ch == null) {
+            errs.push(tag + ' exr.channels required when exr.enforce=true');
+          } else if (ch !== 'preserve') {
+            if (typeof ch !== 'object') {
+              errs.push(tag + ' exr.channels must be an object or "preserve"');
+            } else if (!Array.isArray(ch.required) || ch.required.length === 0) {
+              errs.push(tag + ' exr.channels.required must be a non-empty list');
+              // No alpha-policy field — alpha/extra-matte channels are flagged
+              // universally by the engine (never failed), nothing to validate.
+            }
           }
+        } else if (exr.enforce != null && typeof exr.enforce !== 'boolean') {
+          errs.push(tag + ' exr.enforce must be bool');
         }
-      } else if (exr.enforce != null && typeof exr.enforce !== 'boolean') {
-        errs.push(tag + ' exr.enforce must be bool');
       }
-    }
-    // Colour: optional; mode 'off' (or absent) is inert (mirrors backend _check_colour).
-    const colour = cfg.colour;
-    if (colour && typeof colour === 'object') {
-      const cm = colour.mode == null ? 'off' : colour.mode;
-      if (cm !== 'chromaticities_preserved' && cm !== 'off') {
-        errs.push(tag + " colour.mode must be 'chromaticities_preserved' or 'off'");
+      // Colour: optional; mode 'off' (or absent) is inert.
+      const colour = cfg.colour;
+      if (colour && typeof colour === 'object') {
+        const cm = colour.mode == null ? 'off' : colour.mode;
+        if (cm !== 'chromaticities_preserved' && cm !== 'off') {
+          errs.push(tag + " colour.mode must be 'chromaticities_preserved' or 'off'");
+        }
       }
     }
     reqBool('diff_qc.enabled');
