@@ -429,8 +429,8 @@ function defaultQcConfig() {
       channels: { required: ['R', 'G', 'B'] },
       require_datawindow_eq_displaywindow: false
     },
-    // colour.mode: 'off' (inert) or 'chromaticities_preserved' (== matched source)
-    colour: { mode: 'off' },
+    // colour is a UNIVERSAL v2 check now (return must carry chromaticities +
+    // match source where both have it) — no config block, no off-switch.
     diff_qc: { enabled: false, gain: 10, skip_slate_frame: false },
     resolve: { bin_name: '' },
     // Reserved — engine ignores in Phase 1
@@ -701,14 +701,7 @@ function validateQcConfig() {
           errs.push(tag + ' exr.enforce must be bool');
         }
       }
-      // Colour: optional; mode 'off' (or absent) is inert.
-      const colour = cfg.colour;
-      if (colour && typeof colour === 'object') {
-        const cm = colour.mode == null ? 'off' : colour.mode;
-        if (cm !== 'chromaticities_preserved' && cm !== 'off') {
-          errs.push(tag + " colour.mode must be 'chromaticities_preserved' or 'off'");
-        }
-      }
+      // colour: no config to validate — it's a universal v2 engine check now.
     }
     reqBool('diff_qc.enabled');
     if (_getDeep(cfg, 'diff_qc.enabled') === true) {
@@ -927,10 +920,8 @@ function qcConfigBody(code, data) {
                'Self-consistency check (no source comparison).')
        + '</div></div>';
 
-  // Colour (chromaticities)
-  html += qcSectionBlock('Colour',
-    qcRow('Mode', qcSelectInput(code, 'colour.mode', ['off', 'chromaticities_preserved']),
-          "off = no check. chromaticities_preserved = return chromaticities must equal the matched source's."));
+  // (Colour is a universal v2 engine check now — return must carry
+  // chromaticities + match source where both have it. No form control.)
 
   html += qcSectionBlock('Frame contiguity',
     qcRow('Enforce contiguity', qcBoolInput(code, 'frame_contiguity.enforce'),
