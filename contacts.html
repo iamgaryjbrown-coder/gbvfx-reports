@@ -471,6 +471,8 @@ function normalise(p) {
     sg_forms_contact: p.sg_forms_contact || '',
     delivery_body_qt: p.delivery_body_qt || '',
     delivery_body_exr: p.delivery_body_exr || '',
+    mediashuttle_portal_id: p.mediashuttle_portal_id || '',
+    ms_label: p.ms_label || '',
     contacts: Array.isArray(p.contacts) ? p.contacts : [
       { role: 'Producer', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
       { role: 'PPS', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
@@ -1039,6 +1041,16 @@ function render() {
         <textarea data-code="${code}" data-path="delivery_body_qt" placeholder="Blank = standard QT template" class="delivery-body-ta">${esc(data.delivery_body_qt || '')}</textarea>
         <div class="role" style="padding-top:8px;">EXR delivery body</div>
         <textarea data-code="${code}" data-path="delivery_body_exr" placeholder="Blank = standard EXR template" class="delivery-body-ta">${esc(data.delivery_body_exr || '')}</textarea>
+      </div>`;
+
+    // ── Media Shuttle widget mapping (#4) — portalId → short badge label ──
+    html += `<div class="section-label">Media Shuttle Widget</div>
+      <div class="rm-bcc" style="margin-bottom:8px;">Maps this project's Media Shuttle portal to a short badge on the transfer widget. Either field blank = the widget shows &ldquo;Unknown&rdquo; for this portal.</div>
+      <div class="delivery-body-grid">
+        <div class="role" style="padding-top:8px;">Portal ID</div>
+        <input type="text" data-code="${code}" data-path="mediashuttle_portal_id" placeholder="Media Shuttle portalId (UUID)" value="${esc(data.mediashuttle_portal_id || '')}" />
+        <div class="role" style="padding-top:8px;">Widget label</div>
+        <input type="text" data-code="${code}" data-path="ms_label" placeholder="Short badge text, e.g. CAPA" value="${esc(data.ms_label || '')}" />
       </div>`;
 
     // ── Workflow docs ──
