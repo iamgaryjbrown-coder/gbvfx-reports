@@ -89,7 +89,8 @@
   <div class="check-group">
     <label><input type="checkbox" id="filterUninvoiced"> To Be Invoiced</label>
     <label><input type="checkbox" id="filterForReview"> For Review</label>
-    <label><input type="checkbox" id="filterBidding"> Bidding</label>
+    <label><input type="checkbox" id="filterBidding"> Bidding Vendor</label>
+    <label><input type="checkbox" id="filterBiddingClient"> Bidding Client</label>
     <label><input type="checkbox" id="filterGbFocus"> GB Focus</label>
     <label id="postGradeFilterWrap" style="display:none"><input type="checkbox" id="filterPostGrade"> Post Grade</label>
   </div>
@@ -163,10 +164,13 @@ document.getElementById("colCost").addEventListener("change", function() {
   document.getElementById("costFields").style.display = this.checked ? "block" : "none";
 });
 
-// Bidding preset: a mode that fixes status to "bid" and drops the summary page.
-// Conflicting status-mode filters (Uninvoiced / For Review) are unticked + disabled;
-// the Vendor dropdown stays active (orthogonal axis). Summary-Page episode grid is
-// greyed (no effect with no summary). No prior-state restore on un-tick.
+// Bidding presets — two variants on the same bid-status shot filter:
+//   Bidding Vendor : drops the summary page (vendor doesn't need cost table).
+//   Bidding Client : keeps the summary page (client sees cost roll-up + shot list).
+// Both untick + disable Uninvoiced / For Review (conflicting status modes) and are
+// mutually exclusive with each other. Vendor variant also greys the Summary-Page
+// episode grid (no effect with no summary). Vendor's id is `filterBidding` (kept
+// for backwards compat). No prior-state restore on un-tick.
 function setFilterDisabled(input, disabled) {
   input.disabled = disabled;
   if (input.parentElement) input.parentElement.style.opacity = disabled ? "0.4" : "1";
@@ -180,12 +184,30 @@ document.getElementById("filterBidding").addEventListener("change", function() {
   var on = this.checked;
   var uninv = document.getElementById("filterUninvoiced");
   var forrev = document.getElementById("filterForReview");
-  if (on) { uninv.checked = false; forrev.checked = false; }
+  var bidClient = document.getElementById("filterBiddingClient");
+  if (on) { uninv.checked = false; forrev.checked = false; bidClient.checked = false; }
   setFilterDisabled(uninv, on);
   setFilterDisabled(forrev, on);
+  setFilterDisabled(bidClient, on);
   var sumGrid = document.getElementById("episodeGrid");
   sumGrid.style.opacity = on ? "0.4" : "1";
   sumGrid.style.pointerEvents = on ? "none" : "auto";
+});
+document.getElementById("filterBiddingClient").addEventListener("change", function() {
+  var on = this.checked;
+  var uninv = document.getElementById("filterUninvoiced");
+  var forrev = document.getElementById("filterForReview");
+  var bidVend = document.getElementById("filterBidding");
+  if (on) {
+    uninv.checked = false; forrev.checked = false; bidVend.checked = false;
+    // Vendor may have greyed the summary grid; Client keeps the summary so restore it.
+    var sumGrid = document.getElementById("episodeGrid");
+    sumGrid.style.opacity = "1";
+    sumGrid.style.pointerEvents = "auto";
+  }
+  setFilterDisabled(uninv, on);
+  setFilterDisabled(forrev, on);
+  setFilterDisabled(bidVend, on);
 });
 
 async function apiFetch(path, options) {
@@ -391,13 +413,15 @@ async function generateReport() {
   var filterUninvoiced = document.getElementById("filterUninvoiced").checked;
   var filterForReview = document.getElementById("filterForReview").checked;
   var filterBidding = document.getElementById("filterBidding").checked;
+  var filterBiddingClient = document.getElementById("filterBiddingClient").checked;
+  var anyBidding = filterBidding || filterBiddingClient;
   var filterVendor = document.getElementById("filterVendor").value;
   var filterGbFocus = document.getElementById("filterGbFocus").checked;
   var filterPostGrade = document.getElementById("filterPostGrade").checked;
   // For Review always includes Vers With Edit
   if (filterForReview) showVers = true;
   var dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  var reportType = filterBidding ? "Bidding" : (filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (filterPostGrade ? "Post_Grade" : (showCost ? "Cost" : "Status"))));
+  var reportType = filterBidding ? "Bidding_Vendor" : (filterBiddingClient ? "Bidding_Client" : (filterForReview ? "For_Review" : (filterUninvoiced ? "To_Be_Invoiced" : (filterPostGrade ? "Post_Grade" : (showCost ? "Cost" : "Status")))));
   var filename = "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf";
 
   // Ask for save location FIRST while we still have user-gesture context.
@@ -433,7 +457,7 @@ async function generateReport() {
         filter_uninvoiced: filterUninvoiced,
         filter_for_review: filterForReview,
         filter_vendor: filterVendor,
-        filter_bidding: filterBidding,
+        filter_bidding: anyBidding,
         filter_gb_focus: filterGbFocus,
         filter_post_grade: filterPostGrade
       }),
@@ -461,7 +485,7 @@ async function generateReport() {
       show_invoiced: showInvoiced,
       show_prod: showProd,
       skip_summary: filterBidding,
-      report_title: filterBidding ? "SHOTS IN BIDDING" : (filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : (filterPostGrade ? "SHOTS FOR POST-GRADE" : null))),
+      report_title: (filterBidding || filterBiddingClient) ? "SHOTS IN BIDDING" : (filterForReview ? "SHOTS IN REVIEW" : (filterUninvoiced ? "SHOTS TO BE INVOICED" : (filterPostGrade ? "SHOTS FOR POST-GRADE" : null))),
       filename: "GBVFX_" + projectCode + "_" + reportType + "_" + dateStr + ".pdf",
     };
 
