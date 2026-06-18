@@ -483,6 +483,10 @@ function normalise(p) {
       { role: 'Post Producer', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' },
       { role: 'Post Contact', name: '', email: '', phone: '', qt_role: 'none', exr_role: 'none' }
     ],
+    // Vendors — third contact area (correspondence / mail-intake only; NOT delivery
+    // recipients — see Option A). Empty default; vendors vary per show. qt_role/exr_role
+    // kept on each row for shape-uniformity but not rendered in the recipient matrix.
+    vendor_contacts: Array.isArray(p.vendor_contacts) ? p.vendor_contacts : [],
     workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {}),
     qc_config: mergeQcConfig(p.qc_config)
   };
@@ -1028,6 +1032,16 @@ function render() {
     });
     html += `<div class="add-row">
       <button onclick="addContact('${code}', 'post_contacts')">+ Add post house contact</button>
+    </div>`;
+
+    // ── Vendors (correspondence / mail-intake only — NOT delivery recipients, Option A) ──
+    html += `<div class="section-label">Vendors</div>`;
+    html += `<div class="col-headers"><span>Job Title</span><span>Name</span><span>Email</span><span>Phone</span></div>`;
+    (data.vendor_contacts || []).forEach((c, ci) => {
+      html += contactRow(code, 'vendor_contacts', ci, c);
+    });
+    html += `<div class="add-row">
+      <button onclick="addContact('${code}', 'vendor_contacts')">+ Add vendor</button>
     </div>`;
 
     // ── Delivery recipients (QT / EXR → To / Cc / None per contact) ──
