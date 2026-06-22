@@ -111,6 +111,7 @@
     <label><input type="checkbox" id="colVers"> Vers With Edit</label>
     <label><input type="checkbox" id="colVersDi"> Vers at DI</label>
     <label><input type="checkbox" id="colTimecode"> Timecode</label>
+    <label id="colReelWrap" style="display:none"><input type="checkbox" id="colReel"> Reel</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
     <label><input type="checkbox" id="colPresentNext"> Next Ver Expected</label>
     <label><input type="checkbox" id="colInvoiced"> GB Invoiced</label>
@@ -310,6 +311,21 @@ async function onProjectChange() {
   // blocks, skip the episodes fetch, and self-enable the generate button
   // (renderEpisodes() normally enables it — the feature path bypasses that).
   var isFeature = ((opt.dataset.projectType || "").toLowerCase().indexOf("feature") !== -1);
+
+  // Reel column toggle is Feature-only (sg_reel). Mirror the backend gate by
+  // showing the checkbox only when the selected project is a Feature, and
+  // clearing .checked on switch-away so no stale flag is sent in the payload.
+  var reelWrap = document.getElementById("colReelWrap");
+  if (reelWrap) {
+    if (isFeature) {
+      reelWrap.style.display = "";
+    } else {
+      reelWrap.style.display = "none";
+      var reelCb = document.getElementById("colReel");
+      if (reelCb) reelCb.checked = false;
+    }
+  }
+
   var sumField = document.getElementById("episodeGrid").closest(".field");
   var shotField = document.getElementById("shotEpisodeGrid").closest(".field");
   if (isFeature) {
@@ -408,6 +424,7 @@ async function generateReport() {
   var showVers = document.getElementById("colVers").checked;
   var showVersDi = document.getElementById("colVersDi").checked;
   var showTimecode = document.getElementById("colTimecode").checked;
+  var showReel = document.getElementById("colReel").checked;
   var showExr = document.getElementById("colExr").checked;
   var showPresentNext = document.getElementById("colPresentNext").checked;
   var showInvoiced = document.getElementById("colInvoiced").checked;
@@ -483,6 +500,7 @@ async function generateReport() {
       show_vers: showVers,
       show_vers_di: showVersDi,
       show_timecode: showTimecode,
+      show_reel: showReel,
       show_exr: showExr,
       show_present_next: showPresentNext,
       show_invoiced: showInvoiced,
