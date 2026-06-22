@@ -110,6 +110,7 @@
     <label><input type="checkbox" id="colNotes" checked> Quick Notes</label>
     <label><input type="checkbox" id="colVers"> Vers With Edit</label>
     <label><input type="checkbox" id="colVersDi"> Vers at DI</label>
+    <label><input type="checkbox" id="colTimecode"> Timecode</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
     <label><input type="checkbox" id="colPresentNext"> Next Ver Expected</label>
     <label><input type="checkbox" id="colInvoiced"> GB Invoiced</label>
@@ -406,6 +407,7 @@ async function generateReport() {
   var showNotes = document.getElementById("colNotes").checked;
   var showVers = document.getElementById("colVers").checked;
   var showVersDi = document.getElementById("colVersDi").checked;
+  var showTimecode = document.getElementById("colTimecode").checked;
   var showExr = document.getElementById("colExr").checked;
   var showPresentNext = document.getElementById("colPresentNext").checked;
   var showInvoiced = document.getElementById("colInvoiced").checked;
@@ -480,6 +482,7 @@ async function generateReport() {
       show_notes: showNotes,
       show_vers: showVers,
       show_vers_di: showVersDi,
+      show_timecode: showTimecode,
       show_exr: showExr,
       show_present_next: showPresentNext,
       show_invoiced: showInvoiced,
