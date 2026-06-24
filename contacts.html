@@ -487,6 +487,10 @@ function normalise(p) {
     // recipients — see Option A). Empty default; vendors vary per show. qt_role/exr_role
     // kept on each row for shape-uniformity but not rendered in the recipient matrix.
     vendor_contacts: Array.isArray(p.vendor_contacts) ? p.vendor_contacts : [],
+    // Vendor display aliases (canonical sg_vendor -> short label). OBJECT, not array.
+    // Display-ONLY: used by report_pdf for the VENDOR column + summary breakdown.
+    // Aggregation/sort stay on canonical; alias resolved at draw time only.
+    vendor_display_aliases: (p.vendor_display_aliases && typeof p.vendor_display_aliases === 'object' && !Array.isArray(p.vendor_display_aliases)) ? p.vendor_display_aliases : {},
     workflow_docs: Object.assign({ source_path: '', summary: '', summary_generated_at: '', file_names: [], unresolved_conflicts: [] }, p.workflow_docs || {}),
     qc_config: mergeQcConfig(p.qc_config)
   };
@@ -1044,6 +1048,23 @@ function render() {
       <button onclick="addContact('${code}', 'vendor_contacts')">+ Add vendor</button>
     </div>`;
 
+    // ── Vendor display aliases (canonical sg_vendor -> short report label) ──
+    // Report-only: VENDOR column + summary breakdown on Feature reports show the
+    // alias; totals/sorting stay on the canonical ShotGrid name (canonical for
+    // maths, alias for pixels). Object map; rebuilt from these rows on save.
+    html += `<div class="section-label">Vendor Display Aliases</div>`;
+    html += `<div class="rm-bcc" style="margin-bottom:8px;">Report-only — shortens a ShotGrid vendor name in the VENDOR column &amp; summary breakdown (Feature reports). Totals and sorting use the real ShotGrid name; only the printed label changes. Both fields required; blank rows are ignored. Duplicate canonical names: the last row wins.</div>`;
+    html += `<div class="col-headers" style="display:grid;grid-template-columns:1fr 1fr 32px;gap:8px;"><span>ShotGrid vendor (canonical)</span><span>Display label</span><span></span></div>`;
+    html += `<div id="va-rows-${code}">`;
+    Object.entries(data.vendor_display_aliases || {}).forEach(([canon, disp]) => {
+      html += vendorAliasRow(code, canon, disp);
+    });
+    html += vendorAliasRow(code, '', '');  // trailing blank row for quick add
+    html += `</div>`;
+    html += `<div class="add-row">
+      <button onclick="addVendorAliasRow('${code}')">+ Add vendor alias</button>
+    </div>`;
+
     // ── Delivery recipients (QT / EXR → To / Cc / None per contact) ──
     html += recipientMatrix(code, data);
 
@@ -1439,6 +1460,40 @@ function collectInputs() {
       saved[code][group][idx][field] = el.value;
     }
   });
+  collectVendorAliases();
+}
+
+function vendorAliasRow(code, canon, disp) {
+  // Canonical key + display label. data-code but NO data-path so the generic
+  // collectInputs() skips these — collectVendorAliases() rebuilds the object.
+  return `<div class="va-row" data-code="${code}" style="display:grid;grid-template-columns:1fr 1fr 32px;gap:8px;margin-bottom:6px;align-items:center;">
+    <input class="va-canon" type="text" placeholder="e.g. NINETEEN TWENTY" value="${esc(canon || '')}">
+    <input class="va-disp" type="text" placeholder="e.g. 1920" value="${esc(disp || '')}">
+    <button type="button" title="Remove alias" onclick="this.closest('.va-row').remove()" style="background:none;border:1px solid rgba(255,255,255,0.12);color:#7a8a99;border-radius:4px;cursor:pointer;height:28px;">✕</button>
+  </div>`;
+}
+
+function addVendorAliasRow(code) {
+  const container = document.getElementById('va-rows-' + code);
+  if (container) container.insertAdjacentHTML('beforeend', vendorAliasRow(code, '', ''));
+}
+
+function collectVendorAliases() {
+  // Rebuild each rendered project's vendor_display_aliases OBJECT from its DOM
+  // rows. CANONICAL is the key; both fields required (incomplete rows dropped).
+  // Only codes with rows present in the DOM are touched, so closed/unrendered
+  // projects keep their saved aliases (no accidental wipe). Later duplicate
+  // canonical wins.
+  const byCode = {};
+  document.querySelectorAll('.va-row').forEach(row => {
+    const code = row.dataset.code;
+    if (!code || !saved[code]) return;
+    if (!byCode[code]) byCode[code] = {};
+    const canon = ((row.querySelector('.va-canon') || {}).value || '').trim();
+    const disp = ((row.querySelector('.va-disp') || {}).value || '').trim();
+    if (canon && disp) byCode[code][canon] = disp;
+  });
+  Object.keys(byCode).forEach(code => { saved[code].vendor_display_aliases = byCode[code]; });
 }
 
 function onFilesPicked(code, fileList) {
