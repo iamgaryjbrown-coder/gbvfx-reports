@@ -110,6 +110,7 @@
     <label><input type="checkbox" id="colNotes" checked> Quick Notes</label>
     <label><input type="checkbox" id="colVers"> Vers With Edit</label>
     <label><input type="checkbox" id="colVersDi"> Vers at DI</label>
+    <label><input type="checkbox" id="colGbPresenting"> GB Presenting</label>
     <label><input type="checkbox" id="colTimecode"> Timecode</label>
     <label id="colReelWrap" style="display:none"><input type="checkbox" id="colReel"> Reel</label>
     <label><input type="checkbox" id="colExr"> EXR Package</label>
@@ -423,6 +424,7 @@ async function generateReport() {
   var showNotes = document.getElementById("colNotes").checked;
   var showVers = document.getElementById("colVers").checked;
   var showVersDi = document.getElementById("colVersDi").checked;
+  var showGbPresenting = document.getElementById("colGbPresenting").checked;
   var showTimecode = document.getElementById("colTimecode").checked;
   var showReel = document.getElementById("colReel").checked;
   var showExr = document.getElementById("colExr").checked;
@@ -499,6 +501,7 @@ async function generateReport() {
       show_notes: showNotes,
       show_vers: showVers,
       show_vers_di: showVersDi,
+      show_gb_presenting: showGbPresenting,
       show_timecode: showTimecode,
       show_reel: showReel,
       show_vendor: isFeatureGen && filterVendor === "",
