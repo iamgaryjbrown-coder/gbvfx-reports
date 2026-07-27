@@ -617,9 +617,15 @@ function validateQcConfig() {
     ['server_root','ab_returns_folder','source_folder','source_layout',
      'delivery_qt_folder','delivery_exr_folder','dropbox_project_folder']
       .forEach(k => reqStr('paths.' + k));
+    // Must stay in step with the backend validator (project_config._check_paths)
+    // AND the select options above. When these sets drift, the select silently
+    // rewrites the stored value to its first option on save -- that is how CAPA's
+    // gc_nested was reverted to date_then_pkg three times (2026-06-18, 07-13,
+    // 07-24) before anyone noticed. Adding a token? Add it in all three places.
     const layout = _getDeep(cfg, 'paths.source_layout');
-    if (layout && layout !== 'date_then_pkg' && layout !== 'pkg_per_folder') {
-      errs.push(tag + ' paths.source_layout must be date_then_pkg or pkg_per_folder');
+    if (layout && layout !== 'date_then_pkg' && layout !== 'pkg_per_folder'
+        && layout !== 'gc_nested') {
+      errs.push(tag + ' paths.source_layout must be date_then_pkg, pkg_per_folder or gc_nested');
     }
     reqStr('shot_code.pattern');
     reqStr('shot_code.qt_filename_pattern');
@@ -812,8 +818,11 @@ function qcConfigBody(code, data) {
           'Subdir under /Volumes/desktop-j2eqsn2/')
     + qcRow('AB returns folder', qcStrInput(code, 'paths.ab_returns_folder', { placeholder: 'FROM_AB' }))
     + qcRow('Source folder', qcStrInput(code, 'paths.source_folder', { placeholder: 'FROM_HARBOR' }))
-    + qcRow('Source layout', qcSelectInput(code, 'paths.source_layout', ['date_then_pkg', 'pkg_per_folder']),
-            'date_then_pkg = <date>/<shot>_pkg/<shot>/<WxH>/ (BLM). pkg_per_folder = <pkg>/<shot>/... (TREA).')
+    + qcRow('Source layout', qcSelectInput(code, 'paths.source_layout', ['date_then_pkg', 'pkg_per_folder', 'gc_nested']),
+            'pkg_per_folder = <pkg>/[<date>/]<shot>_PL<NN>/ (TREA). '
+            + 'gc_nested = .../EXR/<shot>_(PL|FG)<NN>/<WxH>/ (CAPA). '
+            + 'date_then_pkg = legacy (BLM/TOM/TTM, all v1). The v2 engine does NOT '
+            + 'implement date_then_pkg - do not set it on a v2 project.')
     + qcRow('Delivery QT folder', qcStrInput(code, 'paths.delivery_qt_folder'))
     + qcRow('Delivery EXR folder', qcStrInput(code, 'paths.delivery_exr_folder'))
     + qcRow('ProRes folder', qcStrInput(code, 'paths.prores_folder', { placeholder: 'DEL/PRORES' }),
