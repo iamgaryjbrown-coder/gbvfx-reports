@@ -380,7 +380,12 @@ function defaultQcConfig() {
       server_root: '',
       ab_returns_folder: '',
       source_folder: '',
-      source_layout: 'date_then_pkg',
+      // Blank, like the other genuinely per-project paths above. There is no
+      // safe convention to inherit: the previous default seeded every new
+      // project with date_then_pkg, which the v2 engine does not implement and
+      // rejects with QcConfigError. required_str flags the blank at save time
+      // for a live project, forcing a deliberate choice.
+      source_layout: '',
       delivery_qt_folder: 'DEL/QT',
       delivery_exr_folder: 'DEL/EXR',
       dropbox_project_folder: '',
@@ -757,8 +762,16 @@ function qcSelectInput(code, path, options) {
   const opts = options.map(o =>
     '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>'
   ).join('');
+  // A stored value matching no option leaves the <select> with nothing selected,
+  // so the browser reports the FIRST option and collectQcInputs persists it.
+  // That is how CAPA's gc_nested was silently reverted three times (2026-06-18,
+  // 07-13, 07-24). Carry the real value instead, marked selected, so it round
+  // trips and reaches the validator as a visible error rather than vanishing.
+  const unrecognised = (typeof v === 'string' && v !== '' && options.indexOf(v) === -1)
+    ? '<option value="' + esc(v) + '" selected>(unrecognised: ' + esc(v) + ')</option>'
+    : '';
   return '<select data-qc-code="' + code + '" data-qc-path="' + path + '" data-qc-type="str">'
-       + opts + '</select>';
+       + unrecognised + opts + '</select>';
 }
 function qcStrListInput(code, path, opts) {
   opts = opts || {};
