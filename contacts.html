@@ -30,6 +30,7 @@
   .project-header .status-pill { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; padding: 3px 8px; border-radius: 10px; }
   .project-header .status-pill.live { background: rgba(46,204,113,0.12); color: #2ecc71; }
   .project-header .status-pill.archived { background: rgba(149,165,166,0.15); color: #95a5a6; }
+  .project-header .status-pill.bid { background: rgba(241,196,15,0.14); color: #f1c40f; }
   .project-header .show-code { font-size: 11px; color: #f39c12; margin-left: auto; font-family: 'SF Mono', monospace; }
 
   .project-body { display: none; padding: 0 18px 18px; }
@@ -508,12 +509,21 @@ function ensureSeeded() {
   Object.keys(saved).forEach(code => { saved[code] = normalise(saved[code]); });
 }
 
+// Which tab a project belongs to. `archived` is the only value that leaves the
+// Live tab. Mirrors report_api.get_projects (skips `archived`) and project_brain
+// (partitions on `archived`), so a `bid` project is visible wherever a live one
+// is and excluded only where archived ones are.
+//
+// Without this, a status the tabs do not name is hidden on BOTH tabs and the
+// project is invisible in the form.
+function statusTab(s) { return (s || 'live') === 'archived' ? 'archived' : 'live'; }
+
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.filter === tab));
   document.querySelectorAll('.project').forEach(el => {
     const s = el.dataset.status || 'live';
-    el.classList.toggle('hidden', s !== tab);
+    el.classList.toggle('hidden', statusTab(s) !== tab);
   });
 }
 
@@ -757,6 +767,25 @@ function qcBoolInput(code, path) {
   return '<input type="checkbox" data-qc-code="' + code + '" data-qc-path="' + path
        + '" data-qc-type="bool"' + (v ? ' checked' : '') + '>';
 }
+// A control that cannot express the stored value must NOT substitute one.
+// Returns an extra <option>, already selected, carrying the real value so it
+// round-trips and is visible rather than silently replaced.
+//
+// Blank is a VALUE ("not set"), not the absence of one. That distinction is the
+// gap the 2026-07-30 fix left open: it carried an unrecognised value but tested
+// `v !== ''`, so a blank still fell through to the first option -- which is how
+// UTNG's deliberately-unset paths.source_layout became BLM's date_then_pkg on
+// 2026-09-09. See gbvfx-backlog #278.
+function carriedOption(v, values) {
+  if (v === '' || v === null || v === undefined) {
+    return '<option value="" selected>(not set)</option>';
+  }
+  if (typeof v === 'string' && values.indexOf(v) === -1) {
+    return '<option value="' + esc(v) + '" selected>(unrecognised: ' + esc(v) + ')</option>';
+  }
+  return '';
+}
+
 function qcSelectInput(code, path, options) {
   const v = _getDeep(saved[code].qc_config, path);
   const opts = options.map(o =>
@@ -765,13 +794,12 @@ function qcSelectInput(code, path, options) {
   // A stored value matching no option leaves the <select> with nothing selected,
   // so the browser reports the FIRST option and collectQcInputs persists it.
   // That is how CAPA's gc_nested was silently reverted three times (2026-06-18,
-  // 07-13, 07-24). Carry the real value instead, marked selected, so it round
-  // trips and reaches the validator as a visible error rather than vanishing.
-  const unrecognised = (typeof v === 'string' && v !== '' && options.indexOf(v) === -1)
-    ? '<option value="' + esc(v) + '" selected>(unrecognised: ' + esc(v) + ')</option>'
-    : '';
+  // 07-13, 07-24). Carry the real value instead -- blank included, see
+  // carriedOption -- so it round trips and reaches the validator as a visible
+  // error rather than vanishing.
+  const carried = carriedOption(v, options);
   return '<select data-qc-code="' + code + '" data-qc-path="' + path + '" data-qc-type="str">'
-       + unrecognised + opts + '</select>';
+       + carried + opts + '</select>';
 }
 function qcStrListInput(code, path, opts) {
   opts = opts || {};
@@ -1009,7 +1037,9 @@ function render() {
     html += `<div class="contact-row">
       <div class="role">Status</div>
       <select data-code="${code}" data-path="status" onchange="updateStatusPill('${code}', this.value)" style="grid-column: 2 / 3;">
+        ${carriedOption(status, ['live', 'bid', 'archived'])}
         <option value="live" ${status === 'live' ? 'selected' : ''}>Live</option>
+        <option value="bid" ${status === 'bid' ? 'selected' : ''}>Bid</option>
         <option value="archived" ${status === 'archived' ? 'selected' : ''}>Archived</option>
       </select>
       <input type="text" data-code="${code}" data-path="production_company" value="${esc(data.production_company)}" placeholder="Production company" style="grid-column: 3 / -1;">
@@ -1192,8 +1222,9 @@ function render() {
     // ── QC CONFIG section (structured ground truth for QC engine) ──
     html += qcConfigSection(code, data);
 
-    const hidden = status !== activeTab ? 'hidden' : '';
-    const pillClass = status === 'archived' ? 'archived' : 'live';
+    const hidden = statusTab(status) !== activeTab ? 'hidden' : '';
+    const pillClass = status === 'archived' ? 'archived'
+                    : (status === 'bid' ? 'bid' : 'live');
 
     const projectEl = document.createElement('div');
     projectEl.className = 'project ' + hidden;
