@@ -1463,10 +1463,14 @@ function updateStatusPill(code, newStatus) {
   const proj = document.querySelector(`[data-show="${code}"]`);
   if (proj) proj.dataset.status = newStatus;
   saved[code].status = newStatus;
-  // Re-apply current tab filter
+  // Re-apply current tab filter. MUST use statusTab, the same rule switchTab
+  // and render use -- this is the third copy of it. Comparing the status to
+  // activeTab directly hides any project whose status the tabs do not name, on
+  // BOTH tabs: changing one project's status made a `bid` project vanish
+  // entirely on 2026-09-10. See gbvfx-backlog #278.
   document.querySelectorAll('.project').forEach(el => {
     const s = el.dataset.status || 'live';
-    el.classList.toggle('hidden', s !== activeTab);
+    el.classList.toggle('hidden', statusTab(s) !== activeTab);
   });
   updateTabCounts();
 }
