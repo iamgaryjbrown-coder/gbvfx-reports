@@ -301,6 +301,15 @@ const workflowOpen = new Set();
 const qcConfigOpen = new Set();
 // Per-project validation errors (computed pre-save). { code: [errStr, ...] }
 const qcValidationErrors = {};
+// #209 (28 Oct 2026): mirror of gbvfx-stack constants.py. SOURCE_LAYOUTS_V2 is
+// what the v2 engine's source finder implements; date_then_pkg is legacy, kept
+// valid for v1 projects (BLM/TOM/TTM). Change these only together with
+// constants.py, the backend validator reads the same two sets.
+const SOURCE_LAYOUTS_V2 = ['gc_nested', 'pkg_per_folder'];
+const SOURCE_LAYOUTS = SOURCE_LAYOUTS_V2.concat(['date_then_pkg']);
+function sourceLayoutsFor(cfg) {
+  return _getDeep(cfg || {}, 'engine_version') === 'v2' ? SOURCE_LAYOUTS_V2 : SOURCE_LAYOUTS;
+}
 
 try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) { saved = {}; }
 // Status each project had when the page loaded: the server's once it answers,
@@ -711,10 +720,14 @@ function validateQcConfig() {
     // rewrites the stored value to its first option on save -- that is how CAPA's
     // gc_nested was reverted to date_then_pkg three times (2026-06-18, 07-13,
     // 07-24) before anyone noticed. Adding a token? Add it in all three places.
+    // #209 (28 Oct 2026): v2 projects accept only the layouts the v2 engine
+    // implements, as project_config._check_paths does since 27 Oct.
     const layout = _getDeep(cfg, 'paths.source_layout');
-    if (layout && layout !== 'date_then_pkg' && layout !== 'pkg_per_folder'
-        && layout !== 'gc_nested') {
-      errs.push(tag + ' paths.source_layout must be date_then_pkg, pkg_per_folder or gc_nested');
+    const layouts = sourceLayoutsFor(cfg);
+    if (layout && layouts.indexOf(layout) === -1) {
+      errs.push(tag + ' paths.source_layout must be ' + layouts.join(' or ')
+                + (_getDeep(cfg, 'engine_version') === 'v2'
+                   ? ' for a v2 project (the v2 engine does not implement ' + layout + ')' : ''));
     }
     reqStr('shot_code.pattern');
     reqStr('shot_code.qt_filename_pattern');
@@ -995,11 +1008,15 @@ function qcConfigBody(code, data) {
           'Subdir under /Volumes/desktop-j2eqsn2/')
     + qcRow('AB returns folder', qcStrInput(code, 'paths.ab_returns_folder', { placeholder: 'FROM_AB' }))
     + qcRow('Source folder', qcStrInput(code, 'paths.source_folder', { placeholder: 'FROM_HARBOR' }))
-    + qcRow('Source layout', qcSelectInput(code, 'paths.source_layout', ['date_then_pkg', 'pkg_per_folder', 'gc_nested']),
+    // #209 (28 Oct 2026): a v2 project is offered only the v2 layouts. A stored
+    // value outside them (e.g. date_then_pkg) is still carried as "(unrecognised)"
+    // by qcSelectInput, so it round-trips and the validator names it.
+    + qcRow('Source layout', qcSelectInput(code, 'paths.source_layout', sourceLayoutsFor(cfg)),
             'pkg_per_folder = <pkg>/[<date>/]<shot>_PL<NN>/ (TREA). '
             + 'gc_nested = .../EXR/<shot>_(PL|FG)<NN>/<WxH>/ (CAPA). '
-            + 'date_then_pkg = legacy (BLM/TOM/TTM, all v1). The v2 engine does NOT '
-            + 'implement date_then_pkg - do not set it on a v2 project.')
+            + (_getDeep(cfg, 'engine_version') === 'v2'
+               ? 'date_then_pkg is not offered: the v2 engine does not implement it.'
+               : 'date_then_pkg = legacy (BLM/TOM/TTM, all v1).'))
     + qcRow('Delivery QT folder', qcStrInput(code, 'paths.delivery_qt_folder'))
     + qcRow('Delivery EXR folder', qcStrInput(code, 'paths.delivery_exr_folder'))
     + qcRow('ProRes folder', qcStrInput(code, 'paths.prores_folder', { placeholder: 'DEL/PRORES' }),
