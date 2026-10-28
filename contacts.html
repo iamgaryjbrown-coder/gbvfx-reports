@@ -434,7 +434,15 @@ function defaultQcConfig() {
       line_order: 'preserve',
       storage: 'preserve',
       channels: { required: ['R', 'G', 'B'] },
-      require_datawindow_eq_displaywindow: false
+      require_datawindow_eq_displaywindow: false,
+      // Mattes (approved layout), a standard setup field for every job (Gary,
+      // 27 Oct 2026: "All new jobs need to be set up as such"). null = none
+      // recorded yet: QC only REPORTS has-matte / no-matte. Once the show's
+      // Colour Loop matte embed is approved, fill in the layout and any shot
+      // that HAS mattes is checked against it. Shape = project_config
+      // _check_mattes: { approved_from, approved_spec: { picture_channels,
+      // matte_channels, pixel_type, compression, generic_part_names, ... } }.
+      mattes: null
     },
     // colour is a UNIVERSAL v2 check now (return must carry chromaticities +
     // match source where both have it) — no config block, no off-switch.
@@ -601,6 +609,7 @@ function collectQcInputs() {
     _setDeep(saved[code].qc_config, path, _coerceQcValue(raw, type));
     count++;
   });
+  collectMatteInputs();
   // Diagnostic: dump the post-collect frames state for every live project so
   // we can prove what made it into saved before validation/render.
   const diag = {};
@@ -613,6 +622,44 @@ function collectQcInputs() {
     } : '(no qc_config.frames)';
   });
   console.log('[qc-config diag] collectQcInputs wrote', count, 'fields. Frames now:', diag);
+}
+
+// Mattes (approved layout) fields -> qc_config.exr.mattes (28 Oct 2026).
+// Not plain data-qc-path inputs, because blanks need care: the server keeps any
+// key the page does NOT send (the save safety net), so a cleared field is sent
+// as null, and clearing every field sends exr.mattes = null, which removes the
+// stored block. Keys the form has no field for (parts, matte_part_names, a
+// {picture, mattes} pixel_type...) are carried over untouched. A project with
+// nothing recorded and nothing typed sends no mattes key at all.
+function collectMatteInputs() {
+  const byCode = {};
+  document.querySelectorAll('[data-matte-code]').forEach(el => {
+    const code = el.dataset.matteCode;
+    const field = el.dataset.matteField;
+    if (!code || !field || !saved[code] || !saved[code].qc_config) return;
+    if (!byCode[code]) byCode[code] = {};
+    byCode[code][field] = _coerceQcValue(el.value, el.dataset.matteType || 'str');
+  });
+  const isBlank = v => v == null || (typeof v === 'string' && v.trim() === '')
+                       || (Array.isArray(v) && v.length === 0);
+  const hasValue = o => Object.keys(o).some(k => o[k] != null);
+  Object.keys(byCode).forEach(code => {
+    const cfg = saved[code].qc_config;
+    if (!cfg.exr || typeof cfg.exr !== 'object') cfg.exr = {};
+    const prev = cfg.exr.mattes;
+    const had = !!(prev && typeof prev === 'object');
+    const m = had ? JSON.parse(JSON.stringify(prev)) : {};
+    const spec = (m.approved_spec && typeof m.approved_spec === 'object') ? m.approved_spec : {};
+    Object.keys(byCode[code]).forEach(f => {
+      const v = byCode[code][f];
+      const val = isBlank(v) ? null : (typeof v === 'string' ? v.trim() : v);
+      if (f === 'approved_from') m.approved_from = val; else spec[f] = val;
+    });
+    m.approved_spec = hasValue(spec) ? spec : null;
+    if (hasValue(m)) cfg.exr.mattes = m;
+    else if (had) cfg.exr.mattes = null;
+    else delete cfg.exr.mattes;
+  });
 }
 
 // Mirrors backend project_config.validate_block. Returns array of error strings
@@ -747,6 +794,8 @@ function validateQcConfig() {
         }
       }
       // colour: no config to validate — it's a universal v2 engine check now.
+      // Mattes: checked whether or not exr.enforce is on, as the backend does.
+      if (exr && typeof exr === 'object') _checkMattes(exr.mattes, tag, errs);
     }
     reqBool('diff_qc.enabled');
     if (_getDeep(cfg, 'diff_qc.enabled') === true) {
@@ -757,6 +806,66 @@ function validateQcConfig() {
     if (errs.length > 0) out[code] = errs;
   });
   return out;
+}
+
+// Mirrors project_config._check_mattes (#310). null fields count as absent,
+// which is how the form clears one (see collectMatteInputs).
+const MATTE_PIXEL_TYPES = ['half', 'float', 'uint'];
+const MATTE_COMPRESSIONS = ['none', 'rle', 'zips', 'zip', 'piz', 'pxr24', 'b44', 'b44a',
+                            'dwaa', 'dwab', 'htj2k256', 'htj2k32'];
+const MATTE_SPEC_FIELDS = ['parts', 'picture_channels', 'matte_channels', 'matte_channel_count',
+                           'generic_part_names', 'pixel_type', 'compression',
+                           'picture_part_name', 'matte_part_names'];
+function _checkMattes(m, tag, errs) {
+  if (m == null) return;
+  const p = tag + ' exr.mattes';
+  if (typeof m !== 'object' || Array.isArray(m)) { errs.push(p + ' must be an object'); return; }
+  const strList = v => Array.isArray(v) && v.length > 0 && v.every(x => typeof x === 'string' && x.trim() !== '');
+  const isInt = v => typeof v === 'number' && Number.isInteger(v);
+  const unknown = Object.keys(m).filter(k => k !== 'approved_spec' && k !== 'approved_from');
+  if (unknown.length) errs.push(p + ' has unknown field(s) ' + unknown.join(', '));
+  if (m.approved_from != null && (typeof m.approved_from !== 'string' || m.approved_from.trim() === '')) {
+    errs.push(p + '.approved_from must be a non-empty string');
+  }
+  const spec = m.approved_spec;
+  if (spec == null) return;
+  const q = p + '.approved_spec';
+  if (typeof spec !== 'object' || Array.isArray(spec)) { errs.push(q + ' must be an object'); return; }
+  const unk = Object.keys(spec).filter(k => MATTE_SPEC_FIELDS.indexOf(k) === -1);
+  if (unk.length) errs.push(q + ' has unknown field(s) ' + unk.join(', '));
+  if (spec.parts != null && (!isInt(spec.parts) || spec.parts < 2)) {
+    errs.push(q + '.parts must be an int, 2 or more (picture + mattes)');
+  }
+  if (!strList(spec.picture_channels)) errs.push(q + '.picture_channels required (e.g. R, G, B)');
+  const mc = spec.matte_channels, mcc = spec.matte_channel_count;
+  if (mc == null && mcc == null) errs.push(q + ' needs a matte channel name (or matte_channel_count)');
+  if (mc != null && !strList(mc)) errs.push(q + '.matte_channels must be a non-empty list of channel names');
+  if (mcc != null && (!isInt(mcc) || mcc < 1)) errs.push(q + '.matte_channel_count must be an int, 1 or more');
+  [['pixel_type', MATTE_PIXEL_TYPES], ['compression', MATTE_COMPRESSIONS]].forEach(([k, allowed]) => {
+    const v = spec[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const ks = Object.keys(v).sort().join(',');
+      if (ks !== 'mattes,picture' || !allowed.includes(v.picture) || !allowed.includes(v.mattes)) {
+        errs.push(q + '.' + k + ' as an object needs exactly picture and mattes, each one of ' + allowed.join(', '));
+      }
+    } else if (!allowed.includes(v)) {
+      errs.push(q + '.' + k + ' required, one of ' + allowed.join(', '));
+    }
+  });
+  if (spec.generic_part_names != null && !strList(spec.generic_part_names)) {
+    errs.push(q + '.generic_part_names must be a non-empty list of names');
+  }
+  if (spec.picture_part_name != null && (typeof spec.picture_part_name !== 'string' || spec.picture_part_name.trim() === '')) {
+    errs.push(q + '.picture_part_name must be a non-empty string');
+  }
+  const mn = spec.matte_part_names;
+  if (mn != null) {
+    if (!strList(mn)) errs.push(q + '.matte_part_names must be a non-empty list of names');
+    else if (isInt(spec.parts) && mn.length !== spec.parts - 1) {
+      errs.push(q + '.matte_part_names lists ' + mn.length + ' name(s) but parts=' + spec.parts
+                + ' means ' + (spec.parts - 1) + ' matte part(s)');
+    }
+  }
 }
 
 // ── QC CONFIG: HTML builders ───────────────────────────────────────────────
@@ -994,6 +1103,8 @@ function qcConfigBody(code, data) {
                'Self-consistency check (no source comparison).')
        + '</div></div>';
 
+  html += qcMattesBlock(code);
+
   // (Colour is a universal v2 engine check now — return must carry
   // chromaticities + match source where both have it. No form control.)
 
@@ -1004,6 +1115,57 @@ function qcConfigBody(code, data) {
 
   html += '</div>';
   return html;
+}
+
+// Mattes (approved layout), 28 Oct 2026: a standard setup field for every job.
+function qcMattesBlock(code) {
+  const m = _getDeep(saved[code].qc_config, 'exr.mattes');
+  const mo = (m && typeof m === 'object') ? m : {};
+  const spec = (mo.approved_spec && typeof mo.approved_spec === 'object') ? mo.approved_spec : {};
+  const attrs = (field, type) => ' data-matte-code="' + esc(code) + '" data-matte-field="' + field
+                                 + '" data-matte-type="' + type + '"';
+  const strIn = (field, v, ph) => '<input type="text"' + attrs(field, 'str') + ' value="'
+                                  + esc(v == null ? '' : v) + '" placeholder="' + esc(ph) + '">';
+  const listIn = (field, v, ph) => '<input type="text"' + attrs(field, 'str_list') + ' value="'
+                                   + esc(Array.isArray(v) ? v.join(', ') : '') + '" placeholder="' + esc(ph) + '">';
+  // A per-part {picture, mattes} value cannot be shown in one select. Show it
+  // read-only and render no input, so the collector carries it over (#278:
+  // a control that cannot express the stored value must not substitute one).
+  const selIn = (field, v, values) => {
+    if (v && typeof v === 'object') {
+      return '<span class="qc-hint">picture: ' + esc(v.picture) + ', mattes: ' + esc(v.mattes)
+             + ' (per part; edit in contacts.json)</span>';
+    }
+    const blank = (v === '' || v == null);
+    return '<select' + attrs(field, 'str') + '>'
+         + '<option value=""' + (blank ? ' selected' : '') + '>(not set)</option>'
+         + (blank ? '' : carriedOption(v, values))
+         + values.map(o => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>'
+                           + esc(o) + '</option>').join('')
+         + '</select>';
+  };
+  const shown = ['picture_channels', 'matte_channels', 'pixel_type', 'compression', 'generic_part_names'];
+  const extra = Object.keys(spec).filter(k => shown.indexOf(k) === -1 && spec[k] != null)
+    .map(k => k + ' = ' + (Array.isArray(spec[k]) ? spec[k].join(', ') : JSON.stringify(spec[k])));
+  return '<div class="qc-block"><h4>Mattes (approved layout)</h4>'
+    + '<div class="qc-hint" style="margin-bottom:8px;">Leave blank until the show\'s Colour Loop matte embed is approved: '
+    + 'QC then only reports whether a shot has mattes. Once filled in, any shot that HAS mattes is checked '
+    + 'against this layout and fails if it is off-spec. Read by the v2 QC engine.</div>'
+    + '<div class="qc-grid">'
+    + qcRow('Approved from', strIn('approved_from', mo.approved_from,
+            'e.g. Harbor pass 6 Oct 2026 on GBVFX_UTNG_20261006_001'),
+            'Where the approval came from: the loop delivery and the spec document.')
+    + qcRow('Picture channels', listIn('picture_channels', spec.picture_channels, 'R, G, B'),
+            'Exact channels of part 0, the picture part. R, G, B means no alpha.')
+    + qcRow('Matte channel name', listIn('matte_channels', spec.matte_channels, 'matte'),
+            'The channel inside each matte part (each matte is its own part).')
+    + qcRow('Pixel type', selIn('pixel_type', spec.pixel_type, MATTE_PIXEL_TYPES))
+    + qcRow('Compression', selIn('compression', spec.compression, MATTE_COMPRESSIONS))
+    + qcRow('Generic part names (not allowed)', listIn('generic_part_names', spec.generic_part_names, 'di'),
+            'Matte part names that fail as not descriptive (e.g. di). Blank = no name check.')
+    + (extra.length ? qcRow('Also recorded', '<span class="qc-hint">' + esc(extra.join('; ')) + '</span>',
+                            'Kept as stored; no field for these here.') : '')
+    + '</div></div>';
 }
 
 function qcConfigSection(code, data) {
