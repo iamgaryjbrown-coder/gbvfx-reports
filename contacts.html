@@ -303,6 +303,16 @@ const qcConfigOpen = new Set();
 const qcValidationErrors = {};
 
 try { saved = JSON.parse(localStorage.getItem('gbvfx_contacts_v2') || '{}'); } catch(e) { saved = {}; }
+// Status each project had when the page loaded: the server's once it answers,
+// else this browser's last copy (review, 28 Oct 2026). A project stored as
+// live or bid is treated as one that is or has been running deliveries: no
+// "set it to Setting up" hint for it, and a confirm before it is switched.
+const storedStatus = {};
+Object.keys(saved).forEach(c => { if (saved[c]) storedStatus[c] = saved[c].status || 'live'; });
+function wasLive(code) {
+  const s = storedStatus[code];
+  return s === 'live' || s === 'bid';
+}
 
 console.log('[contacts-load] localStorage hydrated:',
   Object.keys(saved).map(c => ({
@@ -338,6 +348,7 @@ fetch(API_BASE + '/api/reports/contacts', { headers: { 'Authorization': 'Bearer 
     const diag = [];
     Object.keys(data).forEach(code => {
       const serverProj = data[code] || {};
+      storedStatus[code] = serverProj.status || 'live';
       const localProj = saved[code] || {};
       // Start from server fields
       const out = Object.assign({}, serverProj);
@@ -434,15 +445,17 @@ function defaultQcConfig() {
       line_order: 'preserve',
       storage: 'preserve',
       channels: { required: ['R', 'G', 'B'] },
-      require_datawindow_eq_displaywindow: false,
-      // Mattes (approved layout), a standard setup field for every job (Gary,
-      // 27 Oct 2026: "All new jobs need to be set up as such"). null = none
-      // recorded yet: QC only REPORTS has-matte / no-matte. Once the show's
-      // Colour Loop matte embed is approved, fill in the layout and any shot
-      // that HAS mattes is checked against it. Shape = project_config
-      // _check_mattes: { approved_from, approved_spec: { picture_channels,
-      // matte_channels, pixel_type, compression, generic_part_names, ... } }.
-      mattes: null
+      require_datawindow_eq_displaywindow: false
+      // exr.mattes (approved layout) is a standard setup field for every job
+      // (Gary, 27 Oct 2026: "All new jobs need to be set up as such"), edited
+      // in the "Mattes (approved layout)" block. It is deliberately NOT seeded
+      // here (review, 28 Oct 2026): absent = none recorded, QC only REPORTS
+      // has-matte / no-matte. Only collectMatteInputs, after Gary clears the
+      // rendered fields, ever sends mattes: null (which removes the stored
+      // block); any other save leaves the key out and the server keeps what it
+      // has. Shape = project_config._check_mattes: { approved_from,
+      // approved_spec: { picture_channels, matte_channels, pixel_type,
+      // compression, generic_part_names, ... } }.
     },
     // colour is a UNIVERSAL v2 check now (return must carry chromaticities +
     // match source where both have it) — no config block, no off-switch.
@@ -1212,7 +1225,7 @@ function render() {
     html += `<div class="section-label">Project</div>`;
     html += `<div class="contact-row">
       <div class="role">Status</div>
-      <select data-code="${code}" data-path="status" onchange="updateStatusPill('${code}', this.value)" style="grid-column: 2 / 3;">
+      <select data-code="${code}" data-path="status" onchange="updateStatusPill('${code}', this.value, this)" style="grid-column: 2 / 3;">
         ${carriedOption(status, ['live', 'setting up', 'bid', 'archived'])}
         <option value="live" ${status === 'live' ? 'selected' : ''}>Live</option>
         <option value="setting up" ${status === 'setting up' ? 'selected' : ''}>Setting up (QC not checked)</option>
@@ -1630,7 +1643,17 @@ function toggleProject(header) {
   }
 }
 
-function updateStatusPill(code, newStatus) {
+function updateStatusPill(code, newStatus, selectEl) {
+  // Review MUST 1 (28 Oct 2026): "setting up" makes the delivery system skip
+  // the show, so switching a running one needs a deliberate yes.
+  if (newStatus === 'setting up' && wasLive(code) && saved[code].status !== 'setting up') {
+    const show = saved[code].name || code;
+    if (!confirm('This stops deliveries, QC, the approval poller and arrival monitoring for '
+                 + show + ' until it is live again. Continue?')) {
+      if (selectEl) selectEl.value = saved[code].status || 'live';
+      return;
+    }
+  }
   const pill = document.getElementById('pill-' + code);
   if (pill) {
     pill.textContent = newStatus;
@@ -2060,8 +2083,15 @@ function _showQcValidationFailure(headline, errsByCode) {
     ? '\n• … and ' + (flat.length - PREVIEW_N) + ' more — see per-project banners below'
     : '';
   // #114 (28 Oct 2026): one unfinished project blocks the whole save, so say
-  // how to save the rest without inventing values for it.
-  const hint = '\nNot ready yet? Set that project\'s Status to "Setting up" and save again.';
+  // how to save the rest without inventing values for it. Only for projects
+  // that have never been live (review MUST 1): for a running show (UTNG,
+  // CAPA) Setting up would stop its deliveries, so the error just names the
+  // problem.
+  const newOnes = codes.filter(c => c !== '_' && saved[c] && !wasLive(c));
+  const hint = newOnes.length
+    ? '\nNot ready yet? Set ' + newOnes.map(c => saved[c].name || c).join(', ')
+      + ' to Status "Setting up" and save again.'
+    : '';
   status.textContent = headline + ' — ' + flat.length + ' issue(s):\n' + preview + tail + hint;
   status.style.color = '#e74c3c';
   status.style.whiteSpace = 'pre-line';   // honour the \n's
@@ -2120,7 +2150,14 @@ function saveAll() {
       const qcPart = qc.sha256 ? ' · QC config sha256=' + qc.sha256.slice(0, 12)
                                   + ' (backup: ' + (qc.backup_status || 'n/a') + ')'
                                 : '';
-      status.textContent = 'Saved — ' + brainPart + qcPart;
+      // The server names any stored block an explicit null removed (e.g. a
+      // cleared matte layout), so a removal is never silent (28 Oct 2026).
+      const removed = data.removed || {};
+      const remPart = Object.keys(removed).length
+        ? ' · REMOVED: ' + Object.keys(removed).map(c => c + ' ' + removed[c]
+            .map(p => p.replace(/^qc_config\./, '')).join(', ')).join('; ')
+        : '';
+      status.textContent = 'Saved — ' + brainPart + qcPart + remPart;
       status.style.color = bits.length === 2 ? '#2ecc71' : '#f39c12';
     } else if (r.status === 400 && Array.isArray(data.details)) {
       // Backend QC validation rejection — surface details and treat as a
@@ -2128,7 +2165,8 @@ function saveAll() {
       // listful status banner). Mirrors pre-flight UX so the user is never blind.
       Object.keys(qcValidationErrors).forEach(k => delete qcValidationErrors[k]);
       data.details.forEach(d => {
-        const m = /^\[([A-Z]+)\]/.exec(d);
+        // Any project code, spaces included ("BECOMING CAPA"), 28 Oct 2026.
+        const m = /^\[([^\]]+)\]/.exec(d);
         const c = m ? m[1] : '_';
         if (!qcValidationErrors[c]) qcValidationErrors[c] = [];
         qcValidationErrors[c].push(d);
