@@ -273,7 +273,11 @@ async function loadVendors(projectId) {
     });
     sel.innerHTML = html;
   } catch (e) {
-    // leave the default "All vendors" option in place
+    // The server answers 502 when ShotGrid fails or is slow (review, 28 Oct
+    // 2026): say so, rather than look like a show with no vendors.
+    if (seq !== vendorSeq) return;
+    sel.innerHTML = '<option value="">All vendors</option>'
+                  + '<option value="" disabled>(couldn\'t load vendors, pick the show again to retry)</option>';
   }
 }
 
