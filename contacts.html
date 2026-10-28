@@ -2110,7 +2110,12 @@ function _showQcValidationFailure(headline, errsByCode) {
   }, visibleMs);
 }
 
+// #224 (28 Oct 2026): one hide timer, so an older save's timer cannot hide
+// a newer amber "online copy didn't update" message.
+let _saveStatusTimer = null;
+
 function saveAll() {
+  clearTimeout(_saveStatusTimer);
   collectInputs();
   collectQcInputs();
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
@@ -2138,6 +2143,7 @@ function saveAll() {
     body: JSON.stringify(saved)
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
+    let keepStatus = false;
     if (r.ok) {
       const brain = data.brain || {};
       const qc = data.qc_config || {};
@@ -2157,8 +2163,19 @@ function saveAll() {
         ? ' · REMOVED: ' + Object.keys(removed).map(c => c + ' ' + removed[c]
             .map(p => p.replace(/^qc_config\./, '')).join(', ')).join('; ')
         : '';
-      status.textContent = 'Saved — ' + brainPart + qcPart + remPart;
-      status.style.color = bits.length === 2 ? '#2ecc71' : '#f39c12';
+      // #224 (28 Oct 2026): the server says 'saved_partial' when contacts.json
+      // saved but the Brain missed a target. Say so plainly, in amber, and
+      // leave it up until the next save instead of fading after 8 s.
+      if (data.status === 'saved_partial' || bits.length < 2) {
+        keepStatus = true;
+        const what = brain.vps === false ? 'the online copy' : 'the Claude Code copy of the Brain';
+        status.textContent = 'Saved here, but ' + what + ' didn\u2019t update \u2014 try again.'
+                             + ' (' + brainPart + qcPart + remPart + ')';
+        status.style.color = '#f39c12';
+      } else {
+        status.textContent = 'Saved — ' + brainPart + qcPart + remPart;
+        status.style.color = '#2ecc71';
+      }
     } else if (r.status === 400 && Array.isArray(data.details)) {
       // Backend QC validation rejection — surface details and treat as a
       // first-class failure (auto-expand projects + QC sections, console.error,
@@ -2180,11 +2197,11 @@ function saveAll() {
     }
     // Re-render to show any workflow changes / validation banners
     render();
-    setTimeout(() => status.style.display = 'none', 8000);
+    if (!keepStatus) _saveStatusTimer = setTimeout(() => status.style.display = 'none', 8000);
   }).catch(() => {
     status.textContent = 'Saved locally (server unreachable)';
     status.style.color = '#f39c12';
-    setTimeout(() => status.style.display = 'none', 3000);
+    _saveStatusTimer = setTimeout(() => status.style.display = 'none', 3000);
   });
 }
 
