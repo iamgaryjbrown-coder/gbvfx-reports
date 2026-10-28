@@ -2042,6 +2042,10 @@ function approveModal() {
   saveAll();
 }
 
+// #224 (28 Oct 2026): one hide timer, so an older save's timer cannot hide
+// a newer amber "online copy didn't update" message or a validation banner.
+let _saveStatusTimer = null;
+
 // Shared failure-surfacing handler for QC config validation rejections,
 // from either the frontend pre-flight or the backend 400 response. Ensures:
 //   - Every affected project card AND its QC Config section is auto-expanded
@@ -2102,7 +2106,8 @@ function _showQcValidationFailure(headline, errsByCode) {
 
   // Keep the banner up longer when there's a lot to read; minimum 12s.
   const visibleMs = Math.min(30000, Math.max(12000, flat.length * 800));
-  setTimeout(() => {
+  clearTimeout(_saveStatusTimer);
+  _saveStatusTimer = setTimeout(() => {
     status.style.display = 'none';
     // Restore default centred styling for subsequent successful saves
     status.style.whiteSpace = '';
@@ -2110,12 +2115,11 @@ function _showQcValidationFailure(headline, errsByCode) {
   }, visibleMs);
 }
 
-// #224 (28 Oct 2026): one hide timer, so an older save's timer cannot hide
-// a newer amber "online copy didn't update" message.
-let _saveStatusTimer = null;
-
 function saveAll() {
   clearTimeout(_saveStatusTimer);
+  // A cancelled validation-banner timer no longer restores these; do it here.
+  const _st = document.getElementById('save-status');
+  if (_st) { _st.style.whiteSpace = ''; _st.style.textAlign = ''; }
   collectInputs();
   collectQcInputs();
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
