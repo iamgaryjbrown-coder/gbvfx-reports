@@ -156,7 +156,6 @@ if (TOKEN) {
   loadProjects().then(function() {
     document.getElementById("connDot").classList.add("ok");
     document.getElementById("connBtn").textContent = "Connected";
-    loadVendors();
   }).catch(function() {
     document.getElementById("connDot").classList.remove("ok");
   });
@@ -230,7 +229,6 @@ async function saveToken() {
   document.getElementById("tokenInput").value = "••••••••";
   try {
     await loadProjects();
-    loadVendors();
     document.getElementById("connDot").classList.add("ok");
     document.getElementById("connBtn").textContent = "Connected";
     setStatus("Connected!", "success");
@@ -252,13 +250,26 @@ async function loadProjects() {
   sel.innerHTML = html;
 }
 
-async function loadVendors() {
+// #103 (28 Oct 2026, Gary: yes): the drop-down lists only the vendors on the
+// show picked, fetched on every project change. No project = "All vendors"
+// only. A slower reply for a show no longer selected is dropped (vendorSeq),
+// and a vendor still on the new show stays selected.
+var vendorSeq = 0;
+function escVendor(v) {
+  return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+async function loadVendors(projectId) {
+  var sel = document.getElementById("filterVendor");
+  var keep = sel.value;
+  var seq = ++vendorSeq;
+  sel.innerHTML = '<option value="">All vendors</option>';
+  if (!projectId) return;
   try {
-    var data = await apiFetch("/api/reports/vendors");
-    var sel = document.getElementById("filterVendor");
+    var data = await apiFetch("/api/reports/vendors?project_id=" + encodeURIComponent(projectId));
+    if (seq !== vendorSeq) return;
     var html = '<option value="">All vendors</option>';
     (data.vendors || []).forEach(function(v) {
-      html += '<option value="' + v + '">' + v + '</option>';
+      html += '<option value="' + escVendor(v) + '"' + (v === keep ? ' selected' : '') + '>' + escVendor(v) + '</option>';
     });
     sel.innerHTML = html;
   } catch (e) {
@@ -284,6 +295,7 @@ async function resolveContact(code) {
 async function onProjectChange() {
   var sel = document.getElementById("projectSelect");
   var pid = sel.value;
+  loadVendors(pid);
   if (!pid) {
     document.getElementById("episodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
     document.getElementById("shotEpisodeGrid").innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Select a project first</span>';
