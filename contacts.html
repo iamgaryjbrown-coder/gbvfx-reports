@@ -31,6 +31,7 @@
   .project-header .status-pill.live { background: rgba(46,204,113,0.12); color: #2ecc71; }
   .project-header .status-pill.archived { background: rgba(149,165,166,0.15); color: #95a5a6; }
   .project-header .status-pill.bid { background: rgba(241,196,15,0.14); color: #f1c40f; }
+  .project-header .status-pill.setting-up { background: rgba(93,173,226,0.14); color: #5dade2; }
   .project-header .show-code { font-size: 11px; color: #f39c12; margin-left: auto; font-family: 'SF Mono', monospace; }
 
   .project-body { display: none; padding: 0 18px 18px; }
@@ -518,6 +519,18 @@ function ensureSeeded() {
 // project is invisible in the form.
 function statusTab(s) { return (s || 'live') === 'archived' ? 'archived' : 'live'; }
 
+// #114 (28 Oct 2026): "setting up" is a project registered before its QC config
+// is complete. It shows on the Live tab, saves without QC validation (only
+// "live" is validated, here and in project_config.validate_map), and the
+// delivery system skips it like an archived one. Pill class names cannot hold
+// a space, so the status maps to a class here, in one place.
+function pillClassFor(s) {
+  s = s || 'live';
+  if (s === 'archived' || s === 'bid') return s;
+  if (s === 'setting up') return 'setting-up';
+  return 'live';
+}
+
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.filter === tab));
@@ -603,7 +616,8 @@ function collectQcInputs() {
 }
 
 // Mirrors backend project_config.validate_block. Returns array of error strings
-// keyed by [code]. Live projects validated; archived projects skipped.
+// keyed by [code]. Live projects validated; every other status (archived, bid,
+// "setting up" #114) skipped, as validate_map does.
 function validateQcConfig() {
   const out = {};
   Object.keys(saved).forEach(code => {
@@ -1037,8 +1051,9 @@ function render() {
     html += `<div class="contact-row">
       <div class="role">Status</div>
       <select data-code="${code}" data-path="status" onchange="updateStatusPill('${code}', this.value)" style="grid-column: 2 / 3;">
-        ${carriedOption(status, ['live', 'bid', 'archived'])}
+        ${carriedOption(status, ['live', 'setting up', 'bid', 'archived'])}
         <option value="live" ${status === 'live' ? 'selected' : ''}>Live</option>
+        <option value="setting up" ${status === 'setting up' ? 'selected' : ''}>Setting up (QC not checked)</option>
         <option value="bid" ${status === 'bid' ? 'selected' : ''}>Bid</option>
         <option value="archived" ${status === 'archived' ? 'selected' : ''}>Archived</option>
       </select>
@@ -1223,8 +1238,7 @@ function render() {
     html += qcConfigSection(code, data);
 
     const hidden = statusTab(status) !== activeTab ? 'hidden' : '';
-    const pillClass = status === 'archived' ? 'archived'
-                    : (status === 'bid' ? 'bid' : 'live');
+    const pillClass = pillClassFor(status);
 
     const projectEl = document.createElement('div');
     projectEl.className = 'project ' + hidden;
@@ -1458,7 +1472,7 @@ function updateStatusPill(code, newStatus) {
   const pill = document.getElementById('pill-' + code);
   if (pill) {
     pill.textContent = newStatus;
-    pill.className = 'status-pill ' + newStatus;
+    pill.className = 'status-pill ' + pillClassFor(newStatus);
   }
   const proj = document.querySelector(`[data-show="${code}"]`);
   if (proj) proj.dataset.status = newStatus;
@@ -1490,7 +1504,9 @@ function addProject() {
   const name = (prompt('Project name', code) || code).trim();
   const sgIdStr = (prompt('ShotGrid project ID (number, optional)') || '').trim();
   const sgId = sgIdStr ? parseInt(sgIdStr) : null;
-  saved[code] = normalise({ code, name, sgId, status: 'live' });
+  // #114 (28 Oct 2026): a new project starts as "setting up", so it saves with
+  // just a name and contacts. Switch it to Live once its QC config is filled in.
+  saved[code] = normalise({ code, name, sgId, status: 'setting up' });
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
   render();
 }
@@ -1881,7 +1897,10 @@ function _showQcValidationFailure(headline, errsByCode) {
   const tail = flat.length > PREVIEW_N
     ? '\n• … and ' + (flat.length - PREVIEW_N) + ' more — see per-project banners below'
     : '';
-  status.textContent = headline + ' — ' + flat.length + ' issue(s):\n' + preview + tail;
+  // #114 (28 Oct 2026): one unfinished project blocks the whole save, so say
+  // how to save the rest without inventing values for it.
+  const hint = '\nNot ready yet? Set that project\'s Status to "Setting up" and save again.';
+  status.textContent = headline + ' — ' + flat.length + ' issue(s):\n' + preview + tail + hint;
   status.style.color = '#e74c3c';
   status.style.whiteSpace = 'pre-line';   // honour the \n's
   status.style.textAlign = 'left';
