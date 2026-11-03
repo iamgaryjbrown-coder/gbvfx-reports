@@ -1668,16 +1668,16 @@ function toggleProject(header) {
 // 3 Nov 2026: a live project needs both Media Shuttle widget fields, or the
 // transfer widget shows "Unknown" for its transfers. Live = red mark + hint;
 // "setting up" = amber hint only (new projects start there, so the fields get
-// filled before going live). Any other status, and a BLANK status, is not
-// live here, the same as the daily check (vendor_wiring.py). Advisory only:
-// saving is never blocked.
+// filled before going live). A BLANK status counts as live, as everywhere else
+// (statusTab, render, the delivery system) and in the daily check
+// (vendor_wiring.py). Advisory only: saving is never blocked.
 function refreshMsWidget(code) {
   const portal = document.getElementById('msw-portal-' + code);
   const label = document.getElementById('msw-label-' + code);
   const hint = document.getElementById('msw-hint-' + code);
   if (!portal || !label || !hint) return;
   const sel = document.querySelector('select[data-code="' + CSS.escape(code) + '"][data-path="status"]');
-  const status = ((sel && sel.value) || (saved[code] && saved[code].status) || '').toLowerCase();
+  const status = ((sel && sel.value) || (saved[code] && saved[code].status) || 'live').toLowerCase();
   const live = status === 'live';
   const setup = status === 'setting up';
   const noPortal = (live || setup) && portal.value.trim() === '';
@@ -1686,8 +1686,9 @@ function refreshMsWidget(code) {
   label.classList.toggle('qc-required-empty', live && noLabel);
   const missing = [noPortal ? 'Portal ID' : '', noLabel ? 'Widget label' : ''].filter(Boolean);
   if (!missing.length) { hint.style.display = 'none'; hint.textContent = ''; return; }
-  hint.textContent = (live ? 'Live project, ' + missing.join(' and ') + ' blank. ' : 'Needed before this goes live. ')
-    + 'Needed so the transfer widget can name this show\'s transfers; until then they show "Unknown". '
+  hint.textContent = (live ? 'Live project, ' + missing.join(' and ') + ' blank. ' : 'Before this goes live: ')
+    + (live ? 'Needed so the transfer widget can name this show\'s transfers' : 'the transfer widget needs this to name the show\'s transfers')
+    + '; until then they show "Unknown". '
     + (noPortal ? 'Ask Claude to look up the portal ID while a transfer for this show is running.' : '');
   hint.style.color = live ? '' : '#d4a017';
   hint.style.display = '';
