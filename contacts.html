@@ -1665,28 +1665,31 @@ function toggleProject(header) {
   }
 }
 
-// 3 Nov 2026: a live project needs both Media Shuttle widget fields, or its
-// transfers show "UNKNOWN" on the widget. Marks the two inputs and shows how to
-// find the portal ID. Advisory only: saving is never blocked. Reads the status
-// from the project's select, else the saved copy (blank status counts as live).
-const MSW_HOW_TO_FIND = 'Find the portal ID on MS1, while a transfer for this show is running: '
-  + '~/.config/gbvfx-mediashuttle/ms-transfers.sh | grep -o -i \'"portal[a-z]*" *: *"[^"]*"\' | sort -u';
+// 3 Nov 2026: a live project needs both Media Shuttle widget fields, or the
+// transfer widget shows "Unknown" for its transfers. Live = red mark + hint;
+// "setting up" = amber hint only (new projects start there, so the fields get
+// filled before going live). Any other status, and a BLANK status, is not
+// live here, the same as the daily check (vendor_wiring.py). Advisory only:
+// saving is never blocked.
 function refreshMsWidget(code) {
   const portal = document.getElementById('msw-portal-' + code);
   const label = document.getElementById('msw-label-' + code);
   const hint = document.getElementById('msw-hint-' + code);
   if (!portal || !label || !hint) return;
-  const sel = document.querySelector('select[data-code="' + code + '"][data-path="status"]');
-  const status = ((sel && sel.value) || (saved[code] && saved[code].status) || 'live').toLowerCase();
+  const sel = document.querySelector('select[data-code="' + CSS.escape(code) + '"][data-path="status"]');
+  const status = ((sel && sel.value) || (saved[code] && saved[code].status) || '').toLowerCase();
   const live = status === 'live';
-  const noPortal = live && portal.value.trim() === '';
-  const noLabel = live && label.value.trim() === '';
-  portal.classList.toggle('qc-required-empty', noPortal);
-  label.classList.toggle('qc-required-empty', noLabel);
+  const setup = status === 'setting up';
+  const noPortal = (live || setup) && portal.value.trim() === '';
+  const noLabel = (live || setup) && label.value.trim() === '';
+  portal.classList.toggle('qc-required-empty', live && noPortal);
+  label.classList.toggle('qc-required-empty', live && noLabel);
   const missing = [noPortal ? 'Portal ID' : '', noLabel ? 'Widget label' : ''].filter(Boolean);
   if (!missing.length) { hint.style.display = 'none'; hint.textContent = ''; return; }
-  hint.textContent = 'Live project, ' + missing.join(' and ') + ' blank: its transfers will show UNKNOWN on the widget. '
-    + (noPortal ? MSW_HOW_TO_FIND : '');
+  hint.textContent = (live ? 'Live project, ' + missing.join(' and ') + ' blank. ' : 'Needed before this goes live. ')
+    + 'Needed so the transfer widget can name this show\'s transfers; until then they show "Unknown". '
+    + (noPortal ? 'Ask Claude to look up the portal ID while a transfer for this show is running.' : '');
+  hint.style.color = live ? '' : '#d4a017';
   hint.style.display = '';
 }
 
