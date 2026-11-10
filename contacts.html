@@ -280,10 +280,11 @@ const API_BASE = 'https://deliver.gbvfx.com';
 
 // Default seed — used only if server returns empty
 const SEED = [
-  { code: 'BLM', name: 'Bloomers', sgId: 386, status: 'live' },
-  { code: 'TOM', name: 'Tommy & Tuppence', sgId: 321, status: 'live' },
-  { code: 'TTM', name: 'TTM', sgId: 287, status: 'live' },
-  { code: 'TREA', name: 'Treasure Island', sgId: 420, status: 'live' }
+  // #115 phase 4 (10 Nov 2026): the ShotGrid id lives only in qc_config.shotgrid_id.
+  { code: 'BLM', name: 'Bloomers', qc_config: { shotgrid_id: 386 }, status: 'live' },
+  { code: 'TOM', name: 'Tommy & Tuppence', qc_config: { shotgrid_id: 321 }, status: 'live' },
+  { code: 'TTM', name: 'TTM', qc_config: { shotgrid_id: 287 }, status: 'live' },
+  { code: 'TREA', name: 'Treasure Island', qc_config: { shotgrid_id: 420 }, status: 'live' }
 ];
 
 let saved = {};
@@ -502,7 +503,6 @@ function normalise(p) {
   return {
     code: p.code,
     name: p.name || p.code,
-    sgId: p.sgId || p.shotgrid_project_id || null,
     status: p.status || 'live',
     production_company: p.production_company || '',
     post_house: p.post_house || '',
@@ -1001,7 +1001,7 @@ function qcConfigBody(code, data) {
   // Identity
   html += qcSectionBlock('Identity',
     qcRow('ShotGrid project ID', qcIntInput(code, 'shotgrid_id', { placeholder: '386' }),
-          'Numeric SG project_id. Replaces the duplicate in agent config.json (Phase 4).'));
+          'Numeric SG project_id. The only place it is written: the delivery agent, Reports and Review Notes all read it from here (#115).'));
 
   // Paths
   html += qcSectionBlock('Paths (server-relative)',
@@ -1743,7 +1743,10 @@ function addProject() {
   const sgId = sgIdStr ? parseInt(sgIdStr) : null;
   // #114 (28 Oct 2026): a new project starts as "setting up", so it saves with
   // just a name and contacts. Switch it to Live once its QC config is filled in.
-  saved[code] = normalise({ code, name, sgId, status: 'setting up' });
+  // #115 phase 4 (10 Nov 2026): the id goes into qc_config.shotgrid_id, the one
+  // place it is written; the old top-level sgId is no longer created.
+  saved[code] = normalise({ code, name, status: 'setting up',
+                            qc_config: { shotgrid_id: Number.isInteger(sgId) && sgId > 0 ? sgId : null } });
   localStorage.setItem('gbvfx_contacts_v2', JSON.stringify(saved));
   render();
 }
