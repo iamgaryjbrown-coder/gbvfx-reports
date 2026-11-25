@@ -713,9 +713,22 @@ function validateQcConfig() {
       if (typeof v !== 'boolean') errs.push(tag + ' ' + path + ' required (bool)');
     };
     reqInt('shotgrid_id');
-    ['server_root','ab_returns_folder','source_folder','source_layout',
+    ['server_root','source_folder','source_layout',
      'delivery_qt_folder','delivery_exr_folder','dropbox_project_folder']
       .forEach(k => reqStr('paths.' + k));
+    // #279 phase 2 (24 Nov 2026): AB is an ordinary vendor for delivery. A live
+    // project needs SOME vendor return folder: AB's old key, or any entry in
+    // paths.vendor_folders (e.g. RETURNS/AB). Same rule as the backend
+    // (project_config._check_paths via return_folders); keep the two in step.
+    const _abOld = _getDeep(cfg, 'paths.ab_returns_folder');
+    const _vf = _getDeep(cfg, 'paths.vendor_folders');
+    const _hasVf = Array.isArray(_vf) && _vf.some(v => {
+      const f = (v && typeof v === 'object') ? v.folder : v;
+      return typeof f === 'string' && f.trim() !== '';
+    });
+    if (!(typeof _abOld === 'string' && _abOld.trim() !== '') && !_hasVf) {
+      errs.push(tag + ' paths.ab_returns_folder required, or any vendor return folder in paths.vendor_folders such as RETURNS/AB');
+    }
     // Must stay in step with the backend validator (project_config._check_paths)
     // AND the select options above. When these sets drift, the select silently
     // rewrites the stored value to its first option on save -- that is how CAPA's
@@ -1007,7 +1020,8 @@ function qcConfigBody(code, data) {
   html += qcSectionBlock('Paths (server-relative)',
     qcRow('Server root', qcStrInput(code, 'paths.server_root', { placeholder: 'BLM' }),
           'Subdir under /Volumes/desktop-j2eqsn2/')
-    + qcRow('AB returns folder', qcStrInput(code, 'paths.ab_returns_folder', { placeholder: 'FROM_AB' }))
+    + qcRow('AB returns folder', qcStrInput(code, 'paths.ab_returns_folder', { placeholder: 'RETURNS/AB' }),
+          'Old key (#279). Keep it the same as the RETURNS/AB entry in vendor_folders; it may be blank when vendor_folders holds the project\'s return folders.')
     + qcRow('Source folder', qcStrInput(code, 'paths.source_folder', { placeholder: 'FROM_HARBOR' }))
     // #209 (28 Oct 2026): a v2 project is offered only the v2 layouts. A stored
     // value outside them (e.g. date_then_pkg) is still carried as "(unrecognised)"
