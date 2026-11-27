@@ -237,7 +237,7 @@
 <div class="header">
   <img src="gbvfx_logo.png" alt="GBVFX">
   <h1>Project Brain</h1>
-  <div class="sub">Contacts &middot; Workflow docs &middot; Source of truth for Claude Code &amp; Spud</div>
+  <div class="sub">Contacts &middot; Workflow docs &middot; Source of truth for Claude Code</div>
 </div>
 
 <div class="tabs">
@@ -260,7 +260,7 @@
 <div class="modal-overlay" id="summary-modal">
   <div class="modal">
     <h2 id="modal-title">Workflow summary preview</h2>
-    <div class="modal-sub">Review, edit if needed, then Approve to propagate to Claude Code + Spud. Cancel to discard.</div>
+    <div class="modal-sub">Review, edit if needed, then Approve to propagate to Claude Code. Cancel to discard.</div>
     <div class="modal-scroll">
       <textarea id="modal-textarea" spellcheck="false"></textarea>
       <div class="modal-conflicts" id="modal-conflicts" style="display:none;"></div>
@@ -1623,7 +1623,7 @@ function resolveConflict(code, id) {
 function clearSummary(code) {
   if (!saved[code] || !saved[code].workflow_docs || !saved[code].workflow_docs.summary) return;
   const name = saved[code].name || code;
-  if (!confirm('Wipe the workflow summary for ' + name + '? This will also propagate to Claude Code + Spud on save.')) return;
+  if (!confirm('Wipe the workflow summary for ' + name + '? This will also propagate to Claude Code on save.')) return;
   saved[code].workflow_docs.summary = '';
   saved[code].workflow_docs.summary_generated_at = '';
   saved[code].workflow_docs.file_names = [];
@@ -2184,6 +2184,37 @@ function _showQcValidationFailure(headline, errsByCode) {
   }, visibleMs);
 }
 
+// Words and colour for a 200 from POST /api/reports/contacts.
+// VPS retire Phase 2 (27 Nov 2026): the Brain has one copy, the Claude Code
+// projects.md; the VPS copy for Spud is gone. Works with both server shapes:
+// the old one ({local, vps}) and the new one ({local} only). Amber only when
+// the server says 'saved_partial' or the local copy did not update.
+function saveStatusMessage(data) {
+  const brain = data.brain || {};
+  const qc = data.qc_config || {};
+  const brainPart = brain.local ? 'project brain synced to Claude Code'
+                                : 'brain sync failed (check agent logs)';
+  const qcPart = qc.sha256 ? ' · QC config sha256=' + qc.sha256.slice(0, 12)
+                              + ' (backup: ' + (qc.backup_status || 'n/a') + ')'
+                            : '';
+  // The server names any stored block an explicit null removed (e.g. a
+  // cleared matte layout), so a removal is never silent (28 Oct 2026).
+  const removed = data.removed || {};
+  const remPart = Object.keys(removed).length
+    ? ' · REMOVED: ' + Object.keys(removed).map(c => c + ' ' + removed[c]
+        .map(p => p.replace(/^qc_config\./, '')).join(', ')).join('; ')
+    : '';
+  // #224 (28 Oct 2026): say a partial save plainly, in amber, and leave it up
+  // until the next save instead of fading after 8 s.
+  if (data.status === 'saved_partial' || !brain.local) {
+    const what = brain.local ? 'the old online copy' : 'the Claude Code copy of the Brain';
+    return { keep: true, color: '#f39c12',
+             text: 'Saved here, but ' + what + ' didn\u2019t update \u2014 try again.'
+                   + ' (' + brainPart + qcPart + remPart + ')' };
+  }
+  return { keep: false, color: '#2ecc71', text: 'Saved — ' + brainPart + qcPart + remPart };
+}
+
 function saveAll() {
   clearTimeout(_saveStatusTimer);
   // A cancelled validation-banner timer no longer restores these; do it here.
@@ -2218,37 +2249,10 @@ function saveAll() {
     const data = await r.json().catch(() => ({}));
     let keepStatus = false;
     if (r.ok) {
-      const brain = data.brain || {};
-      const qc = data.qc_config || {};
-      const bits = [];
-      if (brain.local) bits.push('Claude Code');
-      if (brain.vps) bits.push('Spud');
-      const brainPart = bits.length === 2 ? 'project brain synced to Claude Code + Spud' :
-                        bits.length === 1 ? 'synced to ' + bits[0] + ' only (other target failed)' :
-                        'brain sync failed (check agent logs)';
-      const qcPart = qc.sha256 ? ' · QC config sha256=' + qc.sha256.slice(0, 12)
-                                  + ' (backup: ' + (qc.backup_status || 'n/a') + ')'
-                                : '';
-      // The server names any stored block an explicit null removed (e.g. a
-      // cleared matte layout), so a removal is never silent (28 Oct 2026).
-      const removed = data.removed || {};
-      const remPart = Object.keys(removed).length
-        ? ' · REMOVED: ' + Object.keys(removed).map(c => c + ' ' + removed[c]
-            .map(p => p.replace(/^qc_config\./, '')).join(', ')).join('; ')
-        : '';
-      // #224 (28 Oct 2026): the server says 'saved_partial' when contacts.json
-      // saved but the Brain missed a target. Say so plainly, in amber, and
-      // leave it up until the next save instead of fading after 8 s.
-      if (data.status === 'saved_partial' || bits.length < 2) {
-        keepStatus = true;
-        const what = brain.vps === false ? 'the online copy' : 'the Claude Code copy of the Brain';
-        status.textContent = 'Saved here, but ' + what + ' didn\u2019t update \u2014 try again.'
-                             + ' (' + brainPart + qcPart + remPart + ')';
-        status.style.color = '#f39c12';
-      } else {
-        status.textContent = 'Saved — ' + brainPart + qcPart + remPart;
-        status.style.color = '#2ecc71';
-      }
+      const msg = saveStatusMessage(data);
+      keepStatus = msg.keep;
+      status.textContent = msg.text;
+      status.style.color = msg.color;
     } else if (r.status === 400 && Array.isArray(data.details)) {
       // Backend QC validation rejection — surface details and treat as a
       // first-class failure (auto-expand projects + QC sections, console.error,
